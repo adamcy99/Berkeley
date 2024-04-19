@@ -1,0 +1,222 @@
+---
+title: 'Statistical Methods for Discrete Response, Time Series, and Panel Data: Live
+  ession 4'
+author: "Professor Jeffrey Yau"
+date: "2019 Spring"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+# Main Topics Covered in Lecture 4:
+
+  * Multinomial probability distribution
+  * $IJ$ contingency tables and inference using contingency tables
+  * The notion of independence
+  * Nominal response models
+  * Odds ratios in the context of nominal response models
+  * Ordinal logistical regression model
+  * Estimation and statistical inference of these models
+
+# Required Readings:
+
+**BL2015:** Christopher R. Bilder and Thomas M. Loughin. Analysis of Categorical Data with R. CRC Press. 2015.
+
+  - Ch.3 (Skip Sections 3.4.3, 3.5)
+
+# Agenda of Week 4 Live Session
+
+1. Quiz 3
+
+2. An Application of Multinomial Logistic Regressoin: Modeling Voters' Party - Evidence from the 2016 American National Election Survey
+
+
+\newpage
+In this exercise, we want to model voters’ self identified party affiliation using their demographic characteristic and a handful of self-indentifying variables.The data was obtained from the **American National Election Survey**, which conducted a survey several months prior to the $2016$ American Presidential elections. *Note that the original survey data uses survey weights, which we will not use here.*
+
+The dataset “*w271_LiveSession04_data.csv*” contains a handful of variables from the survey, and these variables have been cleaned and modified for this exercise. This dataset contains the following variables:
+
+**Variable Name**            |          **Explanations**
+-----------------------------|----------------------------------------------
+party                        | Categorical variable indicating respondents’       party affiliation: Democrat, Independent, Republican
+-----------------------------| ----------------------------------------------
+Presjob                      | A seven point scale indicating respondents’ evaluation of President Obama. 1 = Very strongly approve; 7 = Very strongly disapprove
+-----------------------------| ----------------------------------------------
+Srv_spend                    | Seven point scale representing the degree to       which respondents believe that the government should provide or should not provide services:  1 = Government should provide many fewer services; 7 = Government should provide many more services.
+-----------------------------| ----------------------------------------------
+age                          | Respondents’ age, as of 2016.
+-----------------------------| ----------------------------------------------
+race_white                   | Dummy variable taking a value of one if the        respondent is white and is zero otherwise.
+-----------------------------| ----------------------------------------------
+female                       | Dummy variable taking a value of one if the        respondent is female and is zero otherwise.
+
+
+#EDA 
+
+Setup Codes and Load Data
+```{r, warning=FALSE, message=FALSE}
+rm(list = ls())
+
+knitr::opts_chunk$set(tidy.opts=list(width.cutoff=60),tidy=TRUE)
+
+# Load Libraries
+library(car)
+library(Hmisc)
+library(dplyr)
+library(skimr)
+library(ggplot2)
+library(stargazer)
+
+library(gmodels) # For cross tabulation (SAS and SPSS style)
+library(MASS)
+library(mcprofile)
+library(vcd)
+library(nnet)
+
+path <- "~/Documents/Teach/Cal/w271/course-main-dev/live-session-files/week04"
+setwd(path)
+
+voters <- read.csv("voters.csv", stringsAsFactors = FALSE, header = TRUE, sep = ",")
+
+# Convert all the character variables to factor variables
+voters <- voters%>%
+  mutate_if(sapply(voters, is.character), as.factor)
+```
+
+**Breakout-room Discussion:**
+  - Discuss the structure of the data
+  - Discuss the patterns of these variables 
+  - Discuss missing values and how you would typically handle them at work
+  - Add additional plots to enhance your EDA where needed
+  
+```{r, warning=FALSE, message=FALSE}
+library(dplyr)
+
+str(voters)
+skim(voters)
+describe(voters)
+
+#voters[!complete.cases(voters),]
+sapply(voters, function(x) sum(is.na(x)))
+
+
+# Keep only the complete cases in the dataset
+voters2 <- voters[complete.cases(voters),]
+
+# Reorder the categories of srv_spend
+voters2$srv_spend <- ordered(voters2$srv_spend, levels = c("Low", "Medium", "High"))
+
+# Attach the dataste
+attach(voters2)
+```
+
+**Pause and Discuss: Missing values**
+For now, we would simply exclude them in our analysis. *In practice, you do not just want to throw away observations without any investigation.*
+
+# EDA:
+
+```{r, warning=FALSE, message=FALSE}
+# Descriptive statistics
+str(voters2)
+skim(voters2)
+describe(voters2)
+
+#Univariate Analysis
+apply(voters2, 2, table)
+exam_cat_var = function(var.names) {
+  round(prop.table(table(var.names)),2)
+}
+apply(voters2, 2, exam_cat_var)
+
+# Bivariate Analysis
+cross_tab = function(xvar, yvar) {
+  CrossTable(xvar, yvar, digits = 2,
+           prop.c = FALSE, prop.t = FALSE)
+}
+# President Approval by Party
+cross_tab(voters2$presjob, voters2$party)
+# Spending Sentiment by Party
+cross_tab(voters2$srv_spend, voters2$party)
+# Gender by Party
+cross_tab(voters2$female, voters2$party)
+# Race by Party
+cross_tab(voters2$race_white, voters2$party)
+# Age Distribution by Party
+ggplot(voters2, aes(factor(party), age)) +  
+  geom_boxplot(aes(fill = factor(party))) + 
+  ggtitle("Age by Party Affiliation") + 
+  theme(plot.title = element_text(lineheight=1, face="bold")) 
+
+# Age Distribution by President Approval
+ggplot(voters2, aes(factor(presjob), age)) +  
+  geom_boxplot(aes(fill = factor(presjob))) + 
+  ggtitle("Age Distribution by President Approval") + 
+  theme(plot.title = element_text(lineheight=1, face="bold")) 
+
+# Age Distribution by Spending Sentiment
+ggplot(voters2, aes(factor(srv_spend), age)) +  
+  geom_boxplot(aes(fill = factor(srv_spend))) + 
+  ggtitle("Age Distribution by Spending Sentiment") + 
+  theme(plot.title = element_text(lineheight=1, face="bold")) 
+
+# President Approval by Spending Sentiment, Gender, and Race
+cross_tab(voters2$srv_spend, voters2$presjob)
+cross_tab(voters2$female, voters2$presjob)
+cross_tab(voters2$race_white, voters2$presjob)
+
+# Spending Sentiment by Party and Race
+cross_tab(voters2$female, voters2$srv_spend)
+cross_tab(voters2$race_white, voters2$srv_spend)
+```
+
+
+# Multinomial Logistic Regression Model
+
+** Breakout-room Discussion: **
+  - Estimate a multinomial logistic regression with only `age`, `female`, and `race_white` as explanatory variables. Call the regression `mod.nomial1`
+  - Discussion the estimation results. For instance, is being a male more or less likely to be a Democrat (relative to being a Republican)? Answer questions like this using your regression results.
+
+
+```{r}
+# mod.nominal1 <- multinom(FORMULA, data = voters2)
+# summary(YOUR ESTIMATED MODEL)
+```
+
+# Statistical Inference
+
+** Breakout-room Discussion: **
+  - As starter, test the existance of the age effect in the logit of independent vs democrat equation. (Hint: For simplicity, use Wald test.)
+  - Test the existence of effect of an explanatory variable on all response categories
+
+
+```{r}
+# YOUR CODE TO BE HERE
+```
+
+
+# Model Interpretation
+** Breakout-room Discussion: **
+  - Interpret the estimated coefficients of the model in terms of estimated odds
+  
+To interpret the coefficients, we first exponentiate the estimated coefficients
+
+```{r}
+# YOUR CODE TO BE HERE
+```
+
+
+# Calculation of Estimated Probabilitie3s
+
+** Breakout-room Discussion **
+  - Estimated probabilities for each of the observations in the sample (it's also called "Fitted Value")
+  - Discuss the estimated probabilities
+
+In practice, however, one could obtaine these estimated probability by simply call the *predict()* function with the correct parameter and a dataset from which the estimated probabilities will be calculated.
+
+
+```{r}
+# YOUR CODE TO BE HERE
+```
+
+
+

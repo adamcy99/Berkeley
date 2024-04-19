@@ -1,0 +1,171 @@
+---
+title: 'W271 Live Session 11: Analysis of Panel Data 1'
+author: "Professor Jeffrey Yau"
+date: "7/12/2018"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+# Main topics covered in Week 11
+    - Introduction to panel data
+    - Using OLS regression model on panel data
+    - Exploratory panel data analysis
+    - Unobserved effect models
+    - Pooled OLS models
+    - First-Difference models
+    - Distributed Lag models
+
+# Readings
+**W2016:** Jeffrey Wooldridge. *Introductory Econometrics: A Modern Approach.* 6th edition. Cengage Learning 
+
+    - Ch. 13 (skip 13.4)
+    - [package plm](https://cran.r-project.org/web/packages/plm/plm.pdf)
+    - [plm vignettes](https://cran.r-project.org/web/packages/plm/vignettes/plm.pdf)
+
+# Agenda for this week's live session:
+
+  1. Quiz
+
+  2. An Introduction to Part III of the course
+
+  3. An Example to illustrate the analysis of panel data
+  
+    - Exploratory data analysis of panel (or longitudinal) data
+    
+    - Individual-level regression, pooled cross-section regression, and first-difference regression
+
+# An Example
+Some start-up codes:
+```{r message=FALSE, warning=TRUE}
+#sessionInfo()
+
+# Insert the function to *tidy up* the code when they are printed out
+library(knitr)
+opts_chunk$set(tidy.opts=list(width.cutoff=60),tidy=TRUE)
+
+# Clean up the workspace before we begin
+rm(list = ls())
+
+# Set working directory
+wd <- "~/Documents/Teach/Cal/w271/course-main-dev/live-session-files/week11"
+setwd(wd)
+
+# Load libraries
+library(car)
+library(dplyr)
+library(Hmisc)
+library(ggplot2)
+library(lattice)
+library(plm)
+```
+
+# 1. Exploratory data analysis of panel data
+
+In this example, we use five waves of data from "National Youth Survey". Each year, participants in the age of 11, 12, 13, 14, 15 filled out a nine-item instrument designed to assess their tolerance of deviant behiavor such as cheat on tests, sell hard drugs, etc. Response to each item is provided in a 4-point scale (1 = very wrong, 2 = wrong, 3 = a little bit wrong, and 4 = not wrong at all). At each occasion (i.e. wave), the outcome, *TOL*, is computed as the respondent's average across the nine responses. Two potential explanatory variables in this dataset include *male*, which is equal to $1$ if the respondent is *male*, and *exposure*, which is a respondent's estimated proportion of their close friends who were involved in each of the nine activities, measuring on a 5-point scale ($0$ = none, $5$ = all).
+
+**Task 1:** 
+    - Import the data as a dataframe. 
+    - Examine the basic structure of each of the datasets. 
+    - Print the person-level dataset. Discuss it.
+    - Also, answer "how many male and female in the dataset?" 
+    - Construct the correlation matrix of the variables tol11 - tol15. Discuss what you observe in this matrix. Do the corrleation values in the matrix make sense? Why? Why not?
+    - Print the person-period level dataset. Discuss it. 
+    - How is the person-period level dataset different from that of the person-level dataset?
+    - Does the person-level dataset contain exactly the same information as that in the person-period-level dataset as far as *tolerance*, *male*, and *exposure* variables are concern? Why? Why not?
+    - Conduct a throughout EDA using ther person-period level dataset
+    
+```{r message=FALSE, warning=TRUE}
+# Person-level dataset
+df <- read.table("tol_person.txt", sep=",", header=T)
+  str(df)
+  print(df)
+  table(df$male)
+  describe(df)
+  
+# Person-period level dataset
+df2 <- read.table("tol_person_period.txt", sep=",", header=T)
+  str(df2)
+  print(df2[c(1:9, 76:80), ])
+  head(df2,10)
+  describe(df)
+  #View(df2)
+
+# Bivariate correlation among tolerance scores assessed on five occassions
+round(cor(df[ ,2:6]),2)
+cor(df[ ,2:6])
+
+str(df2)
+# Some basic EDA
+# Tolerance by age
+describe(df2$tolerance)
+
+g <- ggplot(df2, aes(as.factor(age), tolerance))
+g + geom_boxplot() + geom_jitter(width = 0.2) + ggtitle("Tolerance by age")
+
+# Tolaerance by gender
+g <- ggplot(df2, aes(as.factor(male), tolerance)) 
+g + geom_boxplot() + geom_jitter(width = 0.2) + ggtitle("Tolerance by gender")
+
+# Tolaerance by age and gender
+g <- ggplot(df2, aes(as.factor(age), tolerance))
+g + geom_boxplot(aes(colour = as.factor(male))) + geom_jitter(width = 0.2) + ggtitle("Tolerance by age and gender")
+
+# You repeat the same thing for exposure
+
+# Note that since age and time and both deterministic function of time, using age would be the same as using time.
+head(df2, 10)
+
+```
+
+# 2. Growth-curve Analysis (something not covered in the book and the async)
+
+```{r}
+xyplot(tolerance ~ age | id, data=df2, as.table=T)
+
+# Smooth nonparametric trajectories superimposed on empirical growth plots.
+
+xyplot(tolerance~age | id, data=df2,
+      prepanel = function(x, y) prepanel.loess(x, y, family="gaussian"),
+      xlab = "Age", ylab = "Tolerance",
+      panel = function(x, y) {
+      panel.xyplot(x, y)
+      panel.loess(x,y, family="gaussian") },
+      ylim=c(0, 4), as.table=T)
+
+ggplot(df2, aes(age, tolerance)) +
+  geom_point() +
+  facet_grid(as.factor(id) ~ ., scales = "free", space = "free")
+
+#plot of the raw data
+interaction.plot(df2$age, df2$id, df2$tolerance) 
+
+g <- ggplot(df2, aes(age, tolerance, colour = as.factor(id)))
+g + geom_line() + ggtitle("Growth Curve by ID")
+```
+
+# 3. Build statistical models to answer **"Does being exposed to friends having deviant behavior increase one's tolerance of deviant behavior?"**
+
+  Task 1: Estimate individual-level regression models. Remember that potential explanatory variables include *time*, *male*, and *exposure*. Can you use all of these variables in the regression models?  Why? Why not? Does this regression help us answer the question? Why? Why not?
+  
+  - How about you use only one-year of the data?  (Note: I didn't do this part, and you will have to write your own code.)
+  
+  Task 2: Answer the question using a pooled-OLS appoach. Interpret the model results.
+  
+  Task 3: Answer the question using a first-difference approach. Interpret the model results.
+
+```{r}
+# Task 1: Estimate individual-level regressions
+#YOUR CODE HERE
+  
+
+# Plotting the estimated effect on tolerance by linear fit by id
+#YOUR CODE HERE
+
+# Task 2: Estimate a pooled-OLS model
+#YOUR CODE HERE  
+
+# Task 3: Estimate a first-difference model
+#YOUR CODE HERE
+```
+

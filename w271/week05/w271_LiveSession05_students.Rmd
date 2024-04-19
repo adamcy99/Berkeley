@@ -1,0 +1,425 @@
+---
+title: 'Statistical Methods for Discrete Response, Time Series, and Panel Data: Live
+  Session 5'
+author: "Professor Jeffrey Yau"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+#Main Topics Covered in Lecture 5:
+
+  - Poisson probability model
+  - Poisson regression model
+  - Parameter estimation and statistical inference
+  - Variable selection; bias-variance tradeoff
+  - Model evaluation: in-sample model fit vs. out-of-sample model performance
+
+#Required Readings:
+
+**BL2015:** Christopher R. Bilder and Thomas M. Loughin. Analysis of Categorical Data with R. CRC Press. 2015.
+
+  - Ch.4.1, 4.2.1 – 4.2.2
+    - skim 4.2.3
+  - 5.1 - 5.4
+    - focus on 5.1.5 (on LASSO) and 5.2 (on model fit assessment)
+    - skim 5.1.1 - 5.1.4, 5.2.3, 5.3
+    - skip 5.1.6 
+
+  - Note that the concepts and technique in Chapter 5 apply to all of the models covered so far
+
+# Agenda for the Live Session
+
+  1. Quiz
+  
+  2. Recap of the first five Lectures / Section 1 of the Course
+  
+  3. Mid-course evaluation
+  
+  4. Proportional Odds Model for Orindal Response Data
+  
+  5. Poisson Model for Count Resopnse Data
+
+
+# Regression Models for Orindal Categorical Response Data
+
+## Motivation
+Many categorical response variables have a natural ordering in their levels.
+
+Examples: 
+1. A random sample of the employees in a multinational companies were asked to rate the work environment in their offices. The levels are Poor, Fair, Good, and Very Good. 
+
+2. A response variable may be measured using a Likert scale with categories “strongly disagree,” “disagree,” “neutral,” “agree,” or “strongly agree.”, such as those questions in our course evaluation form.
+
+Arrange the categories such that `category 1 < category 2 < ··· < category J` in some conceptual scale of measurement.
+
+This kind of data is called `ordinal` data. With ordinal data, it is natural to consider probabilities of cumulative events. 
+
+The cumulative probabilities for category $j$ of the random variable $Y$ is expressed as $P(Y \le j) = \sum_{j=1}^J \pi_j$ where $j = 1, \dots , J$ and $P(Y \le J)=1$
+
+Cumulative logits are expressed as 
+
+$$
+\begin{align*}
+logit(P(Y \le j)) &= log \left( \frac{P(Y \le j)}{1-P(Y \le j)}  \right) \\
+&= log \left( \frac{\pi_1 + \dots + \pi_j}{\pi_{j+1} \dots \pi_{J}} \right)
+\end{align*}
+$$
+
+
+We use the regression framework for ordinal multinomial responses to examine the effects of explanatory variables $x_1, \dots , x_K$ on the log-odds of the cumulative probabilities.
+
+# Proportional Odds Model (for Ordinal Response Data)
+
+- Key characteristic: the logit of the cumulative probabilities change linearly with the explanatory variable and the slope of this relationship is identical for all the categories.
+
+$$
+logit \left( P(Y \le j) \right) = \beta_{j0} + \beta_{1}x_1 + \dots + \beta_{K}x_K 
+$$
+for $j = 1, \dots ,J-1$
+
+- The effects of the explanatory variables are assumed to be the same regardless of which cumulative probabilities are used to form the log odds. Proportional odds refers to each odds being a multiple of $exp \left(\beta_{j0}\right)$. That is, increase $x_k$ by $1$ unit, while holding other explanatory variables constant, change every log-odds by $\beta_k$.
+
+Based on the discussion above, we have $P(Y \le 0) = 0$ and $P(Y \le J) = 1$
+
+The probability of observing a category $j$ is
+
+$$
+\begin{align*}
+\pi_j &= P(Y=j) \\
+&= P(Y \le j) - P(Y \le j-1)
+\end{align*}
+$$
+where 
+$$
+P(Y \le j) = \frac{exp(\beta_j0 + \beta_1 x_1 + \dots + \beta_K x_K)}{1 + exp(\beta_j0 + \beta_1 x_1 + \dots + \beta_K x_K)}
+$$
+
+## Visualize the key feature of the Proportional Odds Model
+
+**Breakout Room Discussion:**
+
+  - Discuss the properties of Proportional Odds Model, ensuring that you understand the properties. The graphs below may help with the understanding of the properties.
+
+  - Then, discuss the odds ratios. Make sure that you understand how the formula can be simplified to $e^{c\beta_k}$ 
+
+The following codes are provided by our textbook:
+```{r}
+
+# Remember that beta10 < beta20 < beta30
+beta<-c(0, 2, 4, 2) #beta10, beta20, beta30, beta1
+x.range<-c(-5, 3)
+  
+par(mfrow = c(1, 2))
+
+curve(expr = plogis(q = beta[1] + beta[4]*x), xlim = x.range, ylab = expression(P(Y<=j)), xlab = expression(x[1]), main = "Cumulative probabilities for Y", lwd = 2)
+
+curve(expr = plogis(q = beta[2] + beta[4]*x), add = TRUE, lty = "dashed", col = "red", lwd = 2)
+
+curve(expr = plogis(q = beta[3] + beta[4]*x), add = TRUE, lty = "dotted", , col = "blue", lwd = 2)
+
+legend(x = -5.5, y = 0.9, legend = c(expression(P(Y<=1)), expression(P(Y<=2)), expression(P(Y<=3))), lty = c("solid", "dashed", "dotted", "dotdash"), col = c("black", "red", "blue"), bty = "n", lwd = 2)
+  
+curve(expr = plogis(q = beta[1] + beta[4]*x), xlim = x.range, ylab = expression(pi[j]), xlab = expression(x[1]), main = "Probabilities for Y", lwd = 2)
+
+curve(expr = plogis(q = beta[2] + beta[4]*x) - plogis(q = beta[1] + beta[4]*x), add = TRUE, lty = "dashed", col = "red", lwd = 2)
+
+curve(expr = plogis(q = beta[3] + beta[4]*x) - plogis(q = beta[2] + beta[4]*x), add = TRUE, lty = "dotted", , col = "blue", lwd = 2)
+
+curve(expr = 1 - plogis(q = beta[3] + beta[4]*x), add = TRUE, lty = "dotdash", col = "green", lwd = 2)
+
+legend(x = -5.5, y = 0.9, legend = c(expression(pi[1]), expression(pi[2]), expression(pi[3]), expression(pi[4])), lty = c("solid", "dashed", "dotted", "dotdash"), col = c("black", "red", "blue", "green"), bty = "n", lwd = 2)
+```
+
+# Odds Ratios
+
+$$
+\frac{Odds_{x_k+c}(Y \le j)}{Odds_{x_k}(Y \le j)} |_{\text{all other x's constant}}  = \frac{e^{\beta_{j0}+\beta_1x_1+ \dots + \beta_k(x_k+c) + \dots + \beta_J x_J}}{e^{\beta_{j0}+\beta_1x_1+ \dots + \beta_k x_k + \dots + \beta_J x_J}}=e^{c\beta_k}
+$$
+where $Odds_{x_k}(Y \le j)$ denote the odds of observing category $j$ or smaller for $Y$. The impact of c-unit change in $x_k$ on the odds ratio is 
+$e^{c\beta_k}$. That is, "the odds of $Y \le j$ vs $Y > j$ change by $e^{c\beta_k}$ times for a c-unit increase in $x_k$, holding other explanatory variables in the model constant".
+
+**Breakout Room Discussion**
+
+  - Discuss the EDA, estimation, and the statistical inference of the proportional odds model below.
+
+# Maximum Likelihood Estimation of Proportional Odds Model
+
+To illustrate the estimation and statistical inference in proportional odds model, let's go through an example using a dataset called `gradschool.csv`, which is a very simple dataset asking the respondents "how likely will you apply for graduate school after graduation?" with a three-level response variable ('very likely`, `somewhat likely`, and `unlikely`) with a couple of potential explanatory variable.
+
+# Parameter Estimation (in R)
+
+```{r, warning=FALSE, message=FALSE}
+# Tidy up the code for rendering pdf or html document
+library(knitr)
+opts_chunk$set(tidy.opts=list(width.cutoff=60),tidy=TRUE)
+
+# Clean up the working environment
+rm(list = ls())
+
+# Load Libraries
+library(car)
+library(Hmisc)
+library(skimr)
+library(ggplot2)
+library(stargazer)
+library(gmodels) # For cross tabulation (SAS and SPSS style)
+
+library(MASS) # will use the polr function
+library(mcprofile)
+library(vcd)
+library(nnet)
+
+# Set working directory
+wd <- "~/Documents/Teach/Cal/w271/course-main-dev/live-session-files/week05"
+setwd(wd)
+
+
+#df = read.csv("pol_ideol_data.csv", header=TRUE, sep=",")
+df <- read.csv("gradschool.csv", stringsAsFactors = FALSE, header = T, sep = ",", row.names = 1)
+str(df)
+
+# Just look at the data real quick
+describe(df)
+
+## one at a time, table apply, pared, and public
+lapply(df[, c("apply", "pared", "public")], table)
+
+## three way cross tabs (xtabs) and flatten the table
+ftable(xtabs(~ public + apply + pared, data = df))
+```
+
+Examine the distribution of `gpa` at every level of apply and broken down by public and pared. 
+
+```{r}
+ggplot(df, aes(x = apply, y = gpa)) +
+  geom_boxplot(size = .75) +
+  geom_jitter(alpha = .5) +
+  facet_grid(pared ~ public, margins = TRUE) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1))
+```
+
+```{r}
+levels(as.factor(df$apply))
+df$apply = factor(as.factor(df$apply), levels = c("very likely","somewhat likely","unlikely")) 
+levels(df$apply)
+```
+
+
+Estimate the models and perform LRTs to test the importance of each ex- planatory variable
+```{r}
+# Estimate an ordered logit model and store results in 'polr.fit1'
+polr.fit1 = polr(apply ~ pared + public + gpa, data=df, method ="logistic")
+
+# view a summary of the model
+polr.fit1
+
+# Statistical Inference 
+Anova(polr.fit1)
+
+```
+
+
+# Poisson Regression
+
+**Background (of the Analysis):** 
+Imagine we are helping the academic committee of a high school to model the number awards earned by students based on type of programs the student was enrolled in (based on the historical admission data). The committee provides a small data sample, as a Proof of Concept (POC), that also includes the score of math final exam in previous years.
+
+**Breakout Room Discussion:**
+
+  - Examine the data and the EDA
+
+# The Data
+
+- Load the data (from the CSV file, *PossionEx1.csv*)
+- Some questions to ask when examine the dataset:
+      - What is the number of observations?
+      - What is the number of variables? 
+      - Are there any redundant variables?
+      - Are there any missing information?
+      - Are there any duplicated records?
+      - Are there any values in each of the variables that seem unreasonable?
+  -  Generating insights, if any, from the EDA that may be used in the model specification step in the modeling stage
+    - Any variable transformation would you suggest? Note that I am not just talking about log() transformation. Why? or Why not? 
+    - Any discretation of variables would you suggest? Why? or Why not? 
+    - Any interaction among variables would you suggest? Why? or Why not? 
+
+```{r}
+df = read.csv("PossionEx1.csv", stringsAsFactors = F, header=TRUE, sep=",")
+str(df)
+
+table(df$num_awards)
+df$num_awards
+x <- as.factor(df$num_awards)
+str(x)
+head(x)
+
+x2<- as.factor(df$prog)
+str(x2)
+```
+
+The dataset contains 200 observations and 5 variables, with the variable *X* serving as an ID variable. It looks like it is redundant. We will find out below.
+
+# Checking the number of missing values for each of the variables
+```{r}
+#df[!complete.cases(df),]
+sapply(df, function(x) sum(is.na(x)))
+```
+
+```{r}
+require(Hmisc)
+describe(df)
+```
+
+Note that from the descriptive statistics of each of the variables in the dataset, both `X` and `id` variables have 200 unique values. As id variable is provided by the committee and the variable may indicates a unique id for each of the students, I will keep this variable and ignore the X variable. Also, because the id variable is unique, I am going to assume that there is no duplicated obserations (at least for now).
+
+The information above also confirms that there are no missing value.
+
+The *num_awards* is our dependent variable, and the frequency table above shows its (discrete) distribution that has a large mass at zero and tappers off really fast.
+
+The *prog* is the committee's key explanatory variable of interest. It has 3 levels: academic, general, and vocational.
+
+The *math* variable ranges from 33 to 75 with mean and median being at around 52.
+
+```{r}
+table(df$num_awards)
+prop.table(table(df$num_awards))
+```
+
+The graph below shows the distribution of the number of awards by program types.
+```{r}
+library(ggplot2)
+ggplot(df, aes(num_awards, fill = prog)) +
+  geom_histogram(binwidth=.5, position="dodge") +
+  ggtitle("Number of Awards by Program Type")
+```
+
+```{r}
+summary(df$math)
+ggplot(df, aes(math)) +
+  geom_histogram(binwidth = 2) +
+  ggtitle("Math Score Distribution")
+
+ggplot(df, aes(math)) +
+  geom_freqpoly(binwidth=1) +
+  ggtitle("Math Score Distribution")
+```
+
+```{r}
+ggplot(df, aes(factor(num_awards), math)) +
+  geom_boxplot(aes(fill = factor(num_awards))) + 
+  geom_jitter() +
+  ggtitle("Math Score by the Number of Awards") + 
+  theme(plot.title = element_text(lineheight=1, face="bold")) 
+```
+
+```{r}
+ggplot(df, aes(factor(prog), math)) +
+  geom_boxplot(aes(fill = factor(prog))) + 
+  geom_jitter() +
+  ggtitle("Math Score by Program Type") + 
+  theme(plot.title = element_text(lineheight=1, face="bold")) 
+```
+
+```{r}
+ggplot(df, aes(factor(num_awards), math)) +
+  geom_boxplot(aes(fill = factor(prog))) + 
+  ggtitle("Math Score by Program Type") + 
+  theme(plot.title = element_text(lineheight=1, face="bold")) 
+```
+
+
+**Breakout Room Discussion**
+
+  - Given the specification of a Poisson regression model below,
+    
+    1. Estimate and interpret the model results. Call your model `poisson.mod1`
+    
+    2. Interpret the inference results. (No need to write code.)
+    
+    3. Discuss the prediction. (No need to write code.)
+
+Model 1: A Baseline Model with no feature engineering
+```{r}
+# INSERT YOUR CODE HERE: 1 line to estimate the model
+# INSERT YOUR CODE HERE: 1 line to covert the coefficient for interpretation
+```
+
+
+
+Confidence intervals of the original estimates and the transformed estimates:
+```{r}
+# Confident intervals for the original coefficient estimates
+round(confint(poisson.mod1),4)
+
+# Convert the confidence intervals to percentage change, corresponding to the coefficient estimates
+100*(exp(confint(poisson.mod1)) - 1)
+```
+
+Conduct the Anova() test. Interpret the results.
+```{r}
+library(car)
+Anova(poisson.mod1)
+```
+
+
+```{r}
+plot(x=df$math, exp(poisson.mod1$coefficients[1] + poisson.mod1$coefficients[4]*df$math),
+     xlab="Math Score", 
+     ylab="Mean Estimated Number of Awards",
+     main="Mean Estimated Number of Awards by Academic Programs", lty=1)
+
+curve(expr = exp(poisson.mod1$coefficients[1] +
+                   poisson.mod1$coefficients[2]+poisson.mod1$coefficients[4]*x), 
+      add = TRUE, lwd = 2, col="blue")
+curve(expr = exp(poisson.mod1$coefficients[1] +
+                   poisson.mod1$coefficients[3]+poisson.mod1$coefficients[4]*x), 
+      add = TRUE, lwd = 2, col="green")
+legend(x = 35, y = 3, 
+       legend = c("Academic", "General", "Vocational"), 
+       cex = 0.9, col=c("black","blue","green"), lwd = 2, bty = "n")
+```
+
+# Prediction
+```{r}
+summary(df$math)
+
+sim.data.academic <- data.frame(prog = "Academic", math = 33:75)
+sim.data.general <- data.frame(prog = "General", math = 33:75)
+sim.data.vocational <- data.frame(prog = "Vocational", math = 33:75)
+
+
+predicted.values.academic <- predict.glm(poisson.mod1, 
+                                              newdata = sim.data.academic,
+                                              type = "response", se.fit = FALSE)
+
+predicted.values.general <- predict.glm(poisson.mod1, 
+                                              newdata = sim.data.general,
+                                              type = "response", se.fit = FALSE)
+
+predicted.values.vocational <- predict.glm(poisson.mod1, 
+                                              newdata = sim.data.vocational,
+                                              type = "response", se.fit = FALSE)
+
+predicted.values.all <- cbind(predicted.values.academic,
+                              predicted.values.general,
+                              predicted.values.vocational)
+## And now, plot
+x <- 33:75
+plot(x, predicted.values.academic, type = "l", col = "blue",
+     ylim = c(0,7),
+     main="Predicted Number of Awards by Program Type",
+     xlab = "Math Score", 
+     ylab = "Predicted number of awards")
+lines(x, predicted.values.general, col = "purple")
+lines(x, predicted.values.vocational, col = "black")     
+legend("topright", legend=c("Academic", "General","Vocational"),
+       col=c("navy", "purple","black"), lty=1:3, cex=0.8)
+points(df$num_awards[df$prog == "Academic"], col = "blue",
+       pch = 19, cex = 0.3)
+points(df$num_awards[df$prog == "General"], col = "purple",
+       pch = 19, cex = 0.3)
+points(df$num_awards[df$prog == "Vocational"], col = "black",
+       pch = 19, cex = 0.3)
+```
+

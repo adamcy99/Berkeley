@@ -1,0 +1,207 @@
+---
+title: 'Statistical Methods for Discrete Response, Time Series, and Panel Data: Live
+  Session 6 - Time Series Lecture 1'
+author: "Professor Jeffrey Yau"
+output:
+  pdf_document: default
+  html_notebook: default
+  html_document: default
+---
+
+#Main Topics Covered in Lecture 6:
+
+  - Introduction to time series analysis
+  - Basic terminology of time series analysis
+  - Steps to analyze time series data
+  - Common empirical time series patterns
+  - Examples of simple time series models
+  - Notion and measure of dependency
+  - Examining time series correlation - autocorrelation function (ACF)
+  - Notion of stationarity
+
+#Required Readings:
+
+**CM2009:** Paul S.P. Cowpertwait and Andrew V. Metcalfe. *Introductory Time Series with R*. Springer. 2009. 
+
+  - CM2009: Ch. 1, 2.1.1, 2.2.4, 2.2.5, 2.3, 4.2
+      - Skip Ch. 1.5.4, 1.5.5
+
+# Agenda for the Live Session
+
+  1. Introduction to the Time Series Analysis portion of the course 
+  
+  2. Introduction to the Lecture
+
+  3. Time Series Forecasting: Problem Formulation
+  
+  4. Some Examples
+
+# 1. Introduction of the Lecture and the Time Series Analysis portion of the course
+
+  - Switch to my pdf slides
+
+# 2a. Introduction to the lecture: Why is time series different?
+
+Consider the following scenario.
+
+Suppose your company's management team, just like many other companies' management teams, like to listen to consultants. Recently, they have heard that there is a list of google search terms have historically "correlate" with your company's sales.
+
+The management team really like your team, the Data Science Team that everyone in the company believes perform dark magic, and task your team with the important task of "examining the correlation" between one of these search teams and your company's monthly sales. In fact, they'd like would like to see a linear regression of the company's sales on these search terms. In order to test this hypothesis, you've collectd 10 years worth of monthly data.
+
+Before actually doing this analysis, consider the following complications of using time series data
+
+    1.	The nature of time series data implies that the past could potentially influence the future. One possibility is that the residuals in your simple regression are correlated. If that is the case, then your statistical tests are compromised.
+    
+    2.	It is also possible that each variable’s value is a function of its past values. In this case, company sales in month $t$ is correlated with company sales in month $t-l$, where $l = 1, 2, \dots$. Failure to account for these lagged values in a regression framework leads to invalid estimates.
+
+    3. There could be other complications, but let's stop here for now.
+
+So at a very basic level, when we are dealing with time-series data, it is important for the data scientists to understand the relationships of each of the variables and also model the depedent variable against itself. 
+
+Univariate time-series analysis models the relationship of the current value of a series against its prior values. These relationships can be simple and they can be very complex, but these modeling techniques can answer some very interesting questions and are the building blocks of more complicated techniques that you might be interested in. 
+
+# 2b. Breakout Room Discussion: 
+
+In any empirical analysis, it is critical to first frame the problem correctly.
+
+**Let's take 10 - 15 minutes to chat with your group mates about "time-series" questions, or you think they are time-series questions, you have encountered at work?**
+
+  - In your line of work or industry, now or in recent past, brainstorm how you might encounter time-series data. 
+
+  - Give some examples of the type of questions you and/or your colleagues in your company or industry may ask and how they use time-series analysis to answer them.
+
+  - Please type up the questions, as we will have each group talk about the questions.
+
+
+# 2c. Continue with the introduction of today's lecture
+  - Introduction to time series analysis
+  - Basic terminology of time series analysis
+  - Steps to analyze time series data
+  - Common empirical time series patterns
+  - Examples of simple time series models
+  - Notion and measure of dependency
+  - Examining time series correlation - autocorrelation function (ACF)
+  - Notion of stationarity
+
+Insert the function to *tidy up* the code when they are printed out
+```{r}
+rm(list = ls())
+
+library(knitr)
+opts_chunk$set(tidy.opts=list(width.cutoff=60),tidy=TRUE)
+
+# Set working directory
+wd <- "~/Documents/Teach/Cal/w271/course-main-dev/live-session-files/week06"
+setwd(wd)
+```
+
+
+The following plot shows the weekly cardiovascular mortality rate in Los Angeles.
+```{r}
+library(astsa)
+
+plot(cmort, xlab= "Time in Weeks", ylab="Mortality. Units Unknown")
+title(main="Weekly cardiovascular mortality: 1970-1979") 
+```
+
+# 3. Time Series Forecasting: Problem Formulation
+  
+  - Refer to my slides and syllabus
+
+  
+# 4. Some Examples (if time permits) - Time Series Visualization
+
+
+```{r}
+w=rnorm(500,0,1) # Make 500 independent random draws from a standard normal distribution
+
+plot.ts(w, main="Simulated White Noise", col="navy",
+          ylab="Simulated values", xlab="Simulated Time Period")
+
+hist(w,main="Simulated White Noise", col="blue",
+     xlab="Simulated Values")
+```
+
+```{r}
+library(ggplot2)
+df = data.frame(x=c(1:500), y=rnorm(500,0,1))
+ggplot(df, aes(x,y)) +
+  geom_line() +
+  ggtitle("Simulated White Noise")
+
+# Example 2
+ggplot(economics, aes(date, unemploy)) + 
+  geom_line(colour="blue") +
+  ggtitle("Unemployment")
+
+# Example 3
+ggplot(economics_long, aes(date, value01, colour = variable)) +
+  geom_line()
+```
+
+## Simulate a zero-mean AR(1) Series
+
+$$
+y_t= \phi_0 + \phi_1 y_{t-1} + \omega_t
+$$
+
+```{r}
+
+length(w)
+z <- w
+# We are going to construct a simulated AR(1) model manually instead of
+# using built-in function from R
+for (t in 2:length(w)){
+  z[t] <- 0.7*z[t-1] + w[t] # use the same random normal sequence generated above
+}
+
+par(mfrow=c(1,1))
+hist(z, breaks="FD",
+     main="AR(ar=c(0.7))",
+     xlab="Values of a Simluated Zero-Mean AR(1) Series",
+     col="blue", labels=TRUE)
+
+plot.ts(z, main="Simulated AR(ar=c(0.7)) Series", col="navy",
+        ylab="Values of the Simluated Series",
+        xlab="Simulated Time Period")
+```
+
+
+##  Random walk with and without drift
+```{r}
+# Random walk with zero drift
+x=cumsum(w) 
+
+# Random walk with drift = 0.2
+wd = 0.2 + w; 
+xd = cumsum(wd) 
+
+# Check out the numbers to see if they make sense
+head(cbind(w,x,wd,xd),20)
+
+par(mfrow=c(1,1))
+plot.ts(xd, main="Random Walk with Drift, Random Walk without Drift, Deterministic Trend",
+        col="blue", ylab="Values", xlab="Simulated Time Period", bg=38)
+lines(0.2*(1:length(xd)), lty="dashed", col="navy")
+lines(x, col="purple")
+  # Add vertical lines
+  abline(v=c(100,200,300,400),col=3,lty=3)
+  # Add Legend
+  leg.txt <- c("RW with Drift", "Deterministic Linear Trend", "RW without Drift")
+  legend("topleft", legend=leg.txt, lty=c(1,2,1), col=c("blue","navy","purple"),
+         bty='n', cex=1, merge = TRUE, bg=336)
+
+par(mfrow=c(2,2))
+plot.ts(xd, main="Random Walk with Drift, Random Walk without Drift, Deterministic Trend",
+        col="blue", ylab="Values", xlab="Simulated Time Period", bg=38)
+lines(0.2*(1:length(xd)), lty="dashed", col="navy")
+lines(x, col="purple")
+leg.txt <- c("RW with Drift", "Deterministic Linear Trend", "RW without Drift")
+legend("topleft", legend=leg.txt, lty=c(1,2,1), col=c("blue","navy","purple"),
+       bty='n', cex=1, merge = TRUE, bg=336)
+
+hist(xd, main="RW with Drift", col="blue")
+hist(0.2*(1:length(xd)), main="Deterministic Linear Trend", col="navy")
+hist(x, main="RW without Drift", col="purple")
+```
+

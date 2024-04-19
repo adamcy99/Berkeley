@@ -1,0 +1,164 @@
+---
+title : 'Krysten Thompson w271: Homework 5'
+author: "Professor Jeffrey Yau"
+output: 
+  pdf_document:
+  toc: true
+  number_sections: true
+fontsize: 11pt
+geometry: margin=1in
+---
+
+```{r}
+rm(list = ls())
+library(astsa)
+
+plot(cmort, xlab= "Time in Weeks", ylab="Mortality. Units Unknown")
+title(main="Weekly cardiovascular mortality: 1970-1979") 
+```
+
+1. Conduct the EDA of the `weekly cardiovascular mortality` time series.
+
+```{r}
+cmort
+```
+
+```{r}
+class(cmort)
+```
+
+```{r}
+colnames(cmort)
+```
+
+```{r}
+start(cmort); end(cmort); frequency(cmort)
+```
+
+```{r}
+summary(cmort)
+```
+
+```{r}
+plot(aggregate(cmort))
+```
+
+```{r}
+boxplot(cmort ~ cycle(cmort))
+```
+
+```{r}
+#Trying different things to explore how this all works
+
+cmort.10 <- aggregate(cmort)/10
+cmort.12 <- aggregate(cmort)/12
+cmort.52 <- aggregate(cmort)/52
+```
+
+```{r}
+plot(cbind(cmort.10, cmort.12, cmort.52))
+
+#I see why this doesn't work; left it in to reflect my attempts at EDA 
+```
+
+```{r}
+#want to create snapshot of 1970 to calc ratio
+year.1970 <- window(cmort, start = c(1970, 1), end = c(1970, 12))
+
+ratio.1970 <- mean(year.1970) / mean(cmort)
+
+ratio.1970
+```
+
+```{r}
+#Have to see what happened in 1972 (spike)
+
+year.1972 <- window(cmort, start = c(1972, 1), end = c(1972, 12))
+
+ratio.1972 <- mean(year.1972) / mean(cmort)
+
+ratio.1972 
+```
+
+```{r}
+#now I'm going to create ratio snapshots at various points in 10 years
+
+year.1973 <- window(cmort, start = c(1973, 1), end = c(1973, 12))
+
+ratio.1973 <- mean(year.1973) / mean(cmort)
+
+ratio.1973 
+```
+
+
+```{r}
+#now I'm going to create ratio snapshots at various points in 10 years
+
+year.1974 <- window(cmort, start = c(1974, 1), end = c(1974, 12))
+
+ratio.1974 <- mean(year.1974) / mean(cmort)
+
+ratio.1974 
+```
+
+```{r}
+#now I'm going to create ratio snapshots at various points in 10 years
+
+year.1979 <- window(cmort, start = c(1979, 1), end = c(1979, 12))
+
+ratio.1979 <- mean(year.1979) / mean(cmort)
+
+ratio.1979 
+```
+
+```{r, fig.height=3, fig.width=6}
+par(mfrow=c(1,2))
+
+plot(year.1970)
+plot(year.1972)
+```
+
+```{r, fig.height=3, fig.width=6}
+par(mfrow=c(1,2))
+
+plot(year.1973)
+plot(year.1974)
+```
+
+```{r, fig.height=3, fig.width=6}
+plot(year.1979)
+```
+
+
+2. What features do you notice of the `weekly cardiovascular mortality` time-series plot? 
+
+**There appear to be peaks and valleys which leads one to wonder if some sort of seasonality is at play. However, I'm not sure how seasonality would effect mortality. Also, the overall slope is trending down with time.**
+
+3. Do you think that it is stationary in the mean? In the variance? 
+
+**The mortality data is not stationary in the mean because the mean decreases with time. The variance appears to be stationary (with an exception in what looks to be late 1972) as the spread is generally in range of 40.**
+
+4. What pieces of information did you use from your EDA to arrive at your conclusion?
+
+**I plotted annual trends for 1970, 1972, 1973, 1974, and 1979. I also calculated the ratio of deaths in 1970, 1974, and 1979.**
+
+5. Do you find any evidence that there is a dependency structure in this time series data? Please explain.
+
+**For each of the 5 years I looked at monthly data, it appears there's a general downward trend throughout the year. Each year starts higher than it ends. But I don't know what's happening to cause this.**
+
+6. What is the difference between strict and weak stationarity?
+
+**Strict stationarity means that the probability distribution of a random variable (or joint probability distribution if more than one random variable) remains constant over time. There is no change no matter what snapshot in time is take.**
+
+**Weak stationarity means that only the mean, correlation, and covariance of a random variable are invariant to the movement of time. A weak stationarity model is easier to fit because all that's needed is the mean (expected value).**
+
+7. What is the difference between an acf and pacf plot?
+
+**An acf plot starts with lag 0 while a pacf plot starts at lag 1.**
+
+
+8. (Open-ended question)  Give two examples of questions people in your industry might ask that, based on what you learn in the async lecture, you think can be addressed using time-series analysis.
+
+**When I worked in sales for internet security products sold to consumers, I was accountable for forecasting units sold on weekly basis, as well as sales numbers. I wish I knew then what I'm learning now!**
+
+

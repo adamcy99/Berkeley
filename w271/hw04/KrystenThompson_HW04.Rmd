@@ -1,0 +1,92 @@
+---
+title : 'Krysten Thompson - w271: Homework 4'
+author: "Professor Jeffrey Yau"
+output: 
+  pdf_document:
+  toc: true
+  number_sections: true
+fontsize: 11pt
+geometry: margin=1in
+---
+
+**Question 18 a and b of Chapter 3 (page 192,193)**
+
+For the wheat kernel data (*wheat.csv*), consider a model to estimate the kernel condition using the density explanatory variable as a linear term.
+
+a. Write an R function that computes the log-likelihood
+function for the multinomial regression model. Evaluate the function at the parameter estimates produced by multinom(), and verify that your computed value is the same as that produced by logLik() (use the object saved from multinom() within this function).
+
+Formulas that will be used in this problem:
+
+$$
+P(N_1 = n_1,...N_J = n_J) = \frac{n!}{\prod_{j=1}^J n_j!} \prod_{j=1}^J \pi_{j}^{n_j}
+$$
+
+$$
+log(\hat\pi_{Scab}/\hat\pi_{Healthy}) = Intercept - \beta_1Density
+$$
+$$
+log(\hat\pi_{Sprout}/\hat\pi_{Healthy}) = Intercept - \beta_1Density
+$$
+
+```{r}
+library(nnet)
+wheat <- read.csv('wheat.csv', header=TRUE)
+#head(wheat)
+```
+
+```{r}
+mod.fit <- multinom(formula = type ~ density, data=wheat)
+summary(mod.fit)
+```
+
+```{r}
+
+logL = function(beta, x, Y){
+
+  # Find pi
+  pi_healthy = 1/(1 + exp(beta[1] + beta[3]*x) + exp(beta[2] + beta[4]*x))
+  pi_scab = exp(beta[1] + beta[3]*x) * pi_healthy
+  pi_sprout = exp(beta[2] + beta[4]*x) * pi_healthy
+  
+  # Find the Ys
+  Y_healthy = ifelse(Y == "Healthy", 1, 0)
+  Y_sprout = ifelse(Y == "Sprout", 1, 0)
+  Y_scab = ifelse(Y == "Scab", 1, 0)  
+  
+  sum(Y_healthy*log(pi_healthy) + Y_sprout*log(pi_sprout) + Y_scab*log(pi_scab))
+}
+
+logL(coef(mod.fit), wheat$density, wheat$type)
+
+```
+
+```{r}
+logLik(mod.fit)
+```
+
+------------------------------
+
+b. Maximize the log-likelihood function using optim() to obtain the MLEs and the estimated covariance matrix. Compare your answers to what is obtained by multinom(). Note that to obtain starting values for optim(), one approach is to estimate separate logistic regression models for $log \left( \frac{\pi_2}{\pi_1} \right)$ and $log \left( \frac{\pi_3}{\pi_1} \right)$. These models are estimated only for those observations that have the corresponding responses (e.g., a $Y = 1$ or $Y = 2$ for $log \left( \frac{\pi_2}{\pi_1} \right)$).
+
+```{r}
+mod.fit.optim <- optim(par = summary(mod.fit)$coefficients, fn = logL,
+                       hessian = TRUE, x = wheat$density, Y = wheat$type, control = list(fnscale = -1), method = 'BFGS')
+```
+
+```{r}
+print('Parmeter estimates:')
+mod.fit.optim$par
+cat("\n")
+print('Maximum value for log likelihood function:')
+mod.fit.optim$value
+cat("\n")
+print('0 means convergence achieved:')
+mod.fit.optim$convergence
+cat("\n")
+print('Estimated covariance matrix:')
+-solve(mod.fit.optim$hessian)
+```
+
+
+

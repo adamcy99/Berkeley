@@ -1,0 +1,234 @@
+---
+title: 'W271 Live Session 10: An Intro to Multivarite Time Series Analysis'
+author: "Professor Jeffrey Yau"
+output:
+  pdf_document: default
+  html_notebook: default
+---
+
+# Main topics covered in Week 11
+    - Regression with multiple trending time series
+    - Correlation of time series with trends
+    - Spurious regression
+    - Unit-root non-stationarity and Dickey-Fuller Test
+    - Cointegration
+    - Multivariate Time Series Models: Vector Autoregressive (VAR) model
+        - Estimation, model diagnostics, model identification, model selection, assumption testing, and statistical inference / forecasting
+    - Notion of cross-correlation
+
+
+# Readings
+**CM2009:** Paul S.P. Cowpertwait and Andrew V. Metcalfe. *Introductory Time Series with R*. Springer. 2009. 
+  
+  - Ch. 11
+
+**HA:** Rob J Hyndman and George Athanasopoulos. Forecasting: Principles and Practice (https://otexts.org/fpp2/VAR.html):
+  
+  - Ch. 11.2
+
+
+# Agenda for this week's live session:
+
+  1. Quiz
+  
+  2. VAR model Development: An Example
+  
+  3. VAR Presentation and Concluding Remarks on Time Series Portion of the Course (refer to slides)
+
+Some start-up codes:
+```{r message=FALSE, warning=FALSE}
+#sessionInfo()
+
+# Insert the function to *tidy up* the code when they are printed out
+library(knitr)
+opts_chunk$set(tidy.opts=list(width.cutoff=60),tidy=TRUE)
+
+# Clean up the workspace before we begin
+rm(list = ls())
+
+# Set working directory
+#wd <- "~/Documents/Teach/Cal/w271/course-main-dev/live-session-files/week10"
+#setwd(wd)
+
+# Load libraries
+library(car)
+library(dplyr)
+library(Hmisc)
+
+library(forecast)
+library(fpp2)
+library(astsa)
+library(xts)
+library(vars)
+```
+
+Building a **VAR(p)** model also uses the iterative procedure in which the researchers conduct EDA, estimate the model, evaluate the estimated model, check assumptions, and, once a valid model is chosen, conduct statistical inference and forecasting.
+
+Note that it is no longer that case that we can simply use the individual ACF and PACF of each of the componenet series alone to deterimine the order of a VAR(p) models. We, however, still should conduct EDA because we need to know how to set upthe VAR model in R.  
+
+As AR-type model is only applicable to stationary series, if the series are already stationary, we can model them using a VAR to the data directly (known as a *“VAR in levels”*). If the series are non-stationary but not co-integrated, we take differences of the series in an attempt to transform them to stationary, then estimate a VAR model (known as a *“VAR in differences”*).
+
+In what follow, we will estimate a series VAR model, using information criterion for the selection, a procedure already embedded in a function in the `vars()` library. We will also conduct model diagnostic and forecasting. We will use the *VARselect()* function to select the optimal model (based on information criterion) (again, for now).
+
+A look at the `VAR()` fucntion.
+
+```
+VAR(y, p = 1, type = c("const", "trend", "both", "none"),
+    season = NULL, exogen = NULL, lag.max = NULL,
+    ic = c("AIC", "HQ", "SC", "FPE"))
+    ## S3 method for class  varest 
+    print(x, digits = max(3, getOption("digits") - 3), ...)
+```
+
+It mainly consists of three arguments: 
+  - the data matrix object y (or an object that can be coerced to a matrix)
+  - the integer lag-order p
+  - the type of deterministic regressors to include in the VAR(p) model
+
+An optimal lag-order can be determined based on an information criteria or the final prediction error of a VAR(p) with the function VARselect(). The arguments can be displayed using the `args()` function:
+
+```{r}
+args(VAR)
+```
+
+```{r}
+args(VARselect)
+```
+
+# Example: Canadian Economy
+
+This example takes the data that comes with `vars` library; it consists 
+of 4 macroeconomic time series:
+
+|----------|--------------------|
+| e        | Employment         |
+| prod     | Productivity       |
+| rw       | Real Wage          |
+| U        | unemployment rate  |
+
+```{r}
+data("Canada")
+str(Canada)
+head(Canada)
+```
+
+Since the data is alredy "cleaned" and is stored in a time series object, we can proceed to EDA
+
+```{r}
+plot.ts(Canada, main="4 Macro Time Series of the Canadian Economy")
+
+# Alternvative, we can use autoplot
+# for some reasons, embedded autoplot() within for-loop doesn't print the graph
+
+for (k in 1:ncol(Canada)) {
+  autoplot(Canada[,k])
+}
+
+tsplot <- function(series) {
+  autoplot(series)
+}
+for (k in 1:ncol(Canada)) {
+  #print(paste("Plot ", k))
+  tsplot(Canada[,k])
+}
+
+par(mfrow=c(2,2))
+autoplot(Canada[,1])
+autoplot(Canada[,2])
+autoplot(Canada[,3])
+autoplot(Canada[,4])  
+
+```
+
+```{r}
+# Scatterplot Matrix, which displays the contemporaneous correlation
+scatterplotMatrix(~Canada[,1]+Canada[,2]+Canada[,3]+Canada [,4]);
+  title("Contemporaneous Correlation of the 4 Macroeconomic Series ")
+  
+# Time series plot, ACF and PACF of each of the individual series
+
+tsplot <- function(series, title) {
+  par(mfrow=c(2,2)) 
+  hist(series, main=""); title(title)
+  plot.ts(series, main=""); title(title)
+  acf(series, main=""); title(paste("ACF",title))  
+  pacf(series, main=""); title(paste("ACF",title))    
+}
+tsplot(Canada[,1], "Employment")
+tsplot(Canada[,2], "Productivity")
+tsplot(Canada[,3], "Real Wage")
+tsplot(Canada[,4], "Unmployment Rate")
+
+# Correlation and Cross-correlation between the two series
+par(mfrow=c(1,1))
+
+corrfunc <- function(series1, series2) {
+  cat("Correlation Matrix: ", cor(series1, series2))
+  ccf(series1,series2) 
+}
+
+#corrfunc(Canada[,1],Canada[,2])
+
+for (i in 1:4) {
+  for (j in 1:4) {
+    if (i != j & j > i) {
+    corrfunc(Canada[,i],Canada[,j])
+    }
+  }
+}
+
+```
+
+## Select optimal number of lags
+```{r}
+VARselect(Canada, lag.max = 8, type = "both")
+
+```
+
+The `VARselect()` enables the user to determine an optimal lag length according to an information criteria or the final prediction error of an empirical VAR(p)-process.
+
+The R output above shows the lag length selected by each of the information criteria available in the `vars` package. There is a discrepancy between the VAR(3) selected by the AIC and the VAR(1) selected by the SC. In VAR modeling, we typically select model order using BIC. Note that both BIC (Bayesian Information Criterion) and SC (Schwarz Criterion) are referred to the same information criterion  developed by Gideon E. Schwarz in a paper title "Estimating the Dimension of a Model" published in *The Annals of Statistics* in a 1978.
+
+In a next step, the VAR(1) is estimated with the function VAR() and as deterministic regressors a constant is included.
+
+```{r}
+var.fit1 <- VAR(Canada, p = 1, type = "both")
+summary(var.fit1)
+names(var.fit1)
+```
+
+```{r}
+summary(var.fit1)
+plot(var.fit1)
+```
+
+To check if the VAR(1) with a constant and a trend is a stable process, we will need to check if the moduli of the eigenvalues of the companion matrix are all less than one.
+
+```{r}
+roots(var.fit1)
+```
+
+# Diagnostic Testing
+```{r}
+# Test of normality:
+var.fit1.norm <- normality.test(var.fit1, multivariate.only = TRUE)
+names(var.fit1.norm)
+var.fit1.norm
+
+# Test of no serial correlation:
+var.fit1.ptasy <- serial.test(var.fit1, lags.pt = 12, type = "PT.asymptotic")
+var.fit1.ptasy
+plot(var.fit1.ptasy)
+
+# Test of the absence of ARCH effect:
+var.fit1.arch <- arch.test(var.fit1)
+names(var.fit1.arch)
+var.fit1.arch
+```
+
+Forecast
+```{r}
+forecast(var.fit1) %>%
+  autoplot() + xlab("Date")
+```
+

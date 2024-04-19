@@ -1,0 +1,74 @@
+---
+title : 'w271: Homework 2 (Due: Week 3)'
+author: "Professor Jeffrey Yau"
+output: 
+  pdf_document:
+  toc: true
+  number_sections: true
+fontsize: 11pt
+geometry: margin=1in
+---
+
+# Due: Before the Live Session of Week 3
+
+# Instructions (Please Read it Carefully!):
+
+*  $\textbf{Page limit of the pdf report: None, but please be reasonable}$
+* Page setup: 
+  * Use the following font size, margin, and linespace:
+    * fontsize=11pt
+    * margin=1in
+    * line_spacing=single
+
+* Submission:
+    * Homework needs to be completed individually; this is not a group project. 
+    * Each student submits his/her homework to the course github repo by the deadline; submission and revision made after the deadline will not be graded
+    * Submit 2 files:
+        1. A pdf file that details your answers. Include all the R codes used to produce the answers. *Please do not suppress the codes in your pdf file.*
+        2. R markdown file used to produce the pdf file
+    * Use the following file-naming convensation; fail to do so will receive $10\%$ reduction in the grade:
+        * StudentFirstNameLastName_HWNumber.fileExtension
+        * For example, if the student's name is Kyle Cartman for homework 1, name your files as
+            * KyleCartman_HW1.Rmd
+            * KyleCartman_HW1.pdf
+    * Although it sounds obvious, please write your name on page 1 of your pdf and Rmd files.
+
+    * For statistical methods that we cover in this course, use only the R libraries and functions that are covered in this course. If you use libraries and functions for statistical modeling that we have not covered, you have to  (1) provide an explanation of why such libraries and functions are used instead and (2) reference to the library documentation. **Lacking the explanation and reference to the documentation will result in a score of zero for the corresponding question.** For data wrangling and data visualization, you are free to use other libraries, such as dplyr, ggplot2, etc.
+
+  * For mathematical formulae, type them in your R markdown file. **Do not write them on a piece of paper, snap a photo, and either insert the image file or sumbit the image file separately. Doing so will receive a $0$ for that whole question.**
+
+  *  Students are expected to act with regards to UC Berkeley Academic Integrity.
+
+
+\newpage
+In the live session of week 2, we discussed data analysis, EDA, and binary logistic regression.  This homework is designed to review and practice these concepts and techniques. It also covers variable transformation and associated concepts covered in week 3.
+
+For this homework, you will use the dataset *"data_wk02.csv"*, which contains a small sample of graduate school admission data from a university. The variables are specificed below:
+
+  1. admit - the depenent variable that takes two values: $0,1$ where $1$ denotes *admitted* and $0$ denotes *not admitted*.
+  
+  2. gre - GRE score
+  
+  3. gpa - College GPA
+  
+  4. rank - rank in college major
+
+Suppose you are hired by the University's Admission Committee and are charged to analyze this data to quantify the effect of GRE, GPA, and college rank on admission probability. We will conduct this analysis by answering the follwing questions:
+
+**Question 1:** Examine the data and conduct EDA.
+
+**Question 2:** Estimate a binary logistic regression using the following set of explanatory variables: $gre$, $gpa$, $rank$, $gre^2$, $gpa^2$, and $gre \times gpa$, where $gre \times gpa$ denotes the interaction between $gre$ and $gpa$ variables.
+
+**Question 3:** Test the hypothesis that GRE has no effect on admission using the likelihood ratio test.
+
+**Question 4:** What is the estimated effect of college GPA on admission?
+
+**Question 5:** Construct the confidence interval for the admission probability for the students with $GPA = 3.3$, $GRE = 720$, and $rank=1$.
+
+
+
+
+
+
+
+

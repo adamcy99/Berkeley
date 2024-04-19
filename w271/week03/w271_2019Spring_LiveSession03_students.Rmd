@@ -1,0 +1,237 @@
+---
+title: 'Live Session - Week 3: Discrete Response Models Lecture 3'
+author: "Professor Jeffrey Yau"
+date: "2019 Spring"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+# Agenda
+
+1. Quiz 2 (start promptly 5 minutes after class begins)
+
+2. Lecture intro and review some concepts from w203
+
+3. An extended example to practice concepts/techniques covered in this week: multiple breakout room discussions
+
+4. Discussion of `HW03_dueWeek04`
+
+5. Q&A (if time permits)
+
+
+#Required Readings:
+
+**BL2015:** Christopher R. Bilder and Thomas M. Loughin. Analysis of Categorical Data with R. CRC Press. 2015.
+
+  - Ch. 2.2.5 – 2.2.7, 2.3
+
+
+# Topics covered in Week 3
+
+  * Variable transformation: interactions among explanatory variables
+
+  * Variable transformation: quadratic term 
+
+  * Categorical explanatory variables
+
+  * Odds ratio in the context of categorical explanatory variables
+
+  * Convergence criteria and complete separation
+
+Familiarity with the concepts and techniques coverd in this and last lecture are critical, as they will be used frequently in the next two lectures in situations that are more general (from two categorical to $J > 2$ categories and from unordered cateogrical variables to ordinal variables). With multinomial logistic regression models, the notation will be heavier.
+
+The key objectives in this live session are to learn how to incorporate various transformation of variables (or, in machine learning terminology, "feature engineering") and interpret the results when these transformed variables are part of the model specification. Variable transformations (or feature engineering) are useful in real life statistical and machine learning modeling.
+
+In general, the odd ratios answer the question "how much the odds of success have changed by k-unit increase?" The amazing feature of logistic regression model is that the odd ratios (of the odds of success before and after the k-unit increase in a particular explanatory variable) is simplified to the exponential of the product between k and the coefficient estimate associated with that variable.
+That is, "the odds of a success change by exp(k$\beta_j$) times for every k-unit increase in $x_j$" 
+
+\newpage
+# Review some concepts from w203
+
+$$
+y = \beta_0 + \beta_1 x_1 + \beta_2 x_2 + (\beta_3 x_1 \times x_2) + \epsilon
+$$
+#$$
+#\frac{\partial y}{\partial x_1} = \beta_1
+#$$
+
+
+$$
+\frac{\partial y}{\partial x_1} = \beta_1 + \beta_3 x_2
+$$
+
+$$
+y = \beta_0 + \beta_1 x_1 + \beta_2 x_1^2 + \epsilon
+$$
+
+$$
+\frac{\partial y}{\partial x_1} = \beta_1 + 2 \beta_2 x_1
+$$
+
+# Start-up code
+```{r, message = FALSE, warning=FALSE}
+library(knitr)
+opts_chunk$set(tidy.opts=list(width.cutoff=60),tidy=TRUE)
+
+# Set working directory
+setwd("~/Documents/Teach/Cal/w271/LiveSessions/week03/")
+wd <- getwd()
+wd
+
+# Start with a clean R environment
+rm(list = ls())
+
+# Load Libraries
+library(car)
+require(dplyr)
+library(Hmisc)
+library(skimr)
+library(ggplot2)
+library(stargazer)
+library(mcprofile)
+```
+
+In this live session, we will practice binary logistic regression modeling, with a focus on the materials covered in week 3, using an autism screening dataset (for toddlers). I've obtained this dataset from ![kaggle](https://www.kaggle.com/fabdelja/autism-screening-for-toddlers/home)
+
+Thanks to the generosity of Dr. Fadi Fayez Thabtah, who kindly provides this dataset to kaggle, we have this rarely available dataset on autism screening to practice the concepts and techniques on binary logistic regression modeling that we've learned in the last few weeks.
+
+The dataset also comes with a very detailed description, whose Word document I also share with you. Below are some brief description provided on the aforementioned kaggle webpage:
+
+**Context:**
+The dataset was developed by Dr Fadi Fayez Thabtah (fadifayez.com) using a mobile app called ASDTests (ASDtests.com) to screen autism in toddlers. See the description file attached with the CSV data to know more about the variables and the class. This data can be used for descriptive and predictive analyses such as classification, clustering, regression, etc. You may use it to estimate the predictive power of machine learning techniques in detecting autistic traits.
+
+**Brief Description of the Variables**
+![This data page on kaggle](https://www.kaggle.com/fabdelja/autism-screening-for-toddlers) also provide some very basic descriptive graphs on the variables in this dataset.
+
+`A1 - A10`: Items within Q-Chat-10 in which questions possible answers : “Always, Usually, Sometimes, Rarly & Never” items’ values are mapped to “1” or “0” in the dataset.
+
+There are two variables in the data that will not be used in our analysis:
+  1. `Case_No`: the individual case number; this is an identifier variable
+  2. `Qchat.10.Score`: the dataset document suggests that this variable not be used in a classification problem, as the score variable is used to defined the `Class.ASD.Traits`.
+  
+
+```{r, message = FALSE}
+# Load data
+autism <- read.csv("~/Documents/Teach/Cal/w271/LiveSessions/week03/autism.csv", header=TRUE, sep=",")
+
+# Attach the dataframe autism
+attach(autism)
+
+# Examine the structure of the data
+str(autism)
+
+# Conduct some very basic EDA
+describe(autism)
+summary(autism)
+skim(autism)
+#skim(Age_Mons)
+
+# Define a function to examine factor variables:
+exam_cat_var = function(var.names) {
+  table(var.names)
+  round(prop.table(table(var.names)),2)
+}
+apply(autism[,14:19], 2, table)
+apply(autism[,14:19], 2, exam_cat_var)
+
+# Age
+#describe(Age_Mons)
+#summary(Age_Mons)
+skim(Age_Mons)
+
+# Crosstab
+xtabs(~Sex+Class.ASD.Traits.)
+round(prop.table(xtabs(~Sex+Class.ASD.Traits.),1),2)
+
+xtabs(~Ethnicity + Class.ASD.Traits.)
+round(prop.table(xtabs(~Ethnicity + Class.ASD.Traits.),1),2)
+
+xtabs(~Jaundice + Class.ASD.Traits.)
+round(prop.table(xtabs(~Jaundice + Class.ASD.Traits.),1),2)
+
+xtabs(~Family_mem_with_ASD + Class.ASD.Traits.)
+round(prop.table(xtabs(~Family_mem_with_ASD + Class.ASD.Traits.),1),2)
+
+# Distribution of the Toddlers' Age by ASD Traits
+
+ggplot(autism, aes(factor(Class.ASD.Traits.), Age_Mons)) +  
+  geom_boxplot(aes(fill = factor(Class.ASD.Traits.))) + 
+  ggtitle("Age by ASD Traits") + 
+  theme(plot.title = element_text(lineheight=1, face="bold")) 
+```
+
+Interactions between explanatory variables are needed when the effect of one explanatory variable on the probability of success depends on the value for another explanatory variable. From these graphs, interactions among some of the explanatory variables seem to be warranted.
+
+In `R`, there are several ways to implement interaction terms in a logistic regression model:
+
+  * `formula = y ~ x1 + x2 + x1:x2`
+  
+  * `formula = y ~ x1*x2`
+  
+  * `formula = y ~ (x1 + x2)^2`
+
+To include a quadratic term in a logistic regression model, use the following
+
+  * `formula = y ~ x1 + I(x1^2)`
+
+For factor variables, either turn them into factor variables and enter them into a logistic regression model, which is my preferred method, or use the `factor()` function inside a logistic regression: `formula = y ~ x1 + factor(x2)`, if `x2` needs to enter the regression as a factor variable.
+
+
+# Binary Logistic Regression Modeling
+```{r, warning=FALSE, message=FALSE}
+# Model 1 (Base Model)
+mod.glm1 <- glm(Class.ASD.Traits. ~ Age_Mons + Sex + Ethnicity + Jaundice + Family_mem_with_ASD, family = 'binomial', data = autism)
+summary(mod.glm1)
+
+# Model 2 (Model with both interaction and Non-linear effect)
+# interaction of age and sex
+# a quadratic term on age
+
+#mod.glm2 <- glm(YOUR FORMULAR HERE, family = 'binomial', data = autism)
+#summary(mod.glm2)
+
+# Display the models together
+#stargazer(mod.glm1, mod.glm2, type = 'text')
+```
+
+# Testing Model Differences
+```{r, warning=FALSE, message=FALSE}
+# CODE HERE (1 line) 
+```
+
+Based on the test result, we will use `mod.glm2`.
+
+Our model:
+$$
+log(\frac{\pi}{1-\pi}) = \beta_0 + \beta_1 Age\_Mons + \beta_2 Age\_Mons^2 + \beta_3 Sexm + \beta_4 Ethnicityblack + \beta_5 EthnicityHispanic + \beta_6 EthnicityLatino + \beta_7 Ethnicitymixed + \beta_8 EthnicityNative Indian + \beta_9 EthnicityOthers + \beta_10 EthnicityPacifica + \beta_11 Ethnicitysouth asian + \beta_12 EthnicityWhite European + \beta_13 Jaundiceyes + \beta_14 Family_mem_with_ASDyes + \beta_15 Age_Mons:Sexm
+$$
+
+The odds ratio for an increase in age by $c$ months is expressed in the following formula:
+$$
+OR = exp(c \beta_1 + c \beta_2(2 \times age + c) )
+$$
+which depends on the level of age.
+
+# Model Interpretation
+We need some questions, such as
+
+  * What is the effect of being a $30$-month old boy on the odds of having ADS traits? 
+
+```{r, warning=FALSE, message=FALSE}
+c = 1
+Age_Mons = 30
+# YOUR CODE HERE (1 line)
+```
+
+
+  * What is the effect of an one month increase in age (measured in months) of a $24$ months old `female` toddler on the odds of having ADS traits? (Hint: use the formula above.)
+
+```{r, warning=FALSE, message=FALSE}
+c = 1
+Age_Mons = 24
+Sexm = 0
+
+# YOUR CODE HERE (1 line)
+```
+

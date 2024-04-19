@@ -1,0 +1,323 @@
+---
+title: 'w271: Homework 2'
+author: "Krysten Thompson"
+geometry: margin=1in
+output:
+  pdf_document: null
+  word_document: default
+  toc: yes
+  number_sections: yes
+fontsize: 11pt
+---
+
+```{r}
+library(knitr)
+opts_chunk$set(tidy.opts=list(width.cutoff=60),tidy=TRUE)
+```
+
+In the live session of week 2, we discussed data analysis, EDA, and binary logistic regression.  This homework is designed to review and practice these concepts and techniques. It also covers variable transformation and associated concepts covered in week 3.
+
+For this homework, you will use the dataset *"data_wk02.csv"*, which contains a small sample of graduate school admission data from a university. The variables are specificed below:
+
+  1. admit - the depenent variable that takes two values: $0,1$ where $1$ denotes *admitted* and $0$ denotes *not admitted*.
+  
+  2. gre - GRE score
+  
+  3. gpa - College GPA
+  
+  4. rank - rank in college major
+
+Suppose you are hired by the University's Admission Committee and are charged to analyze this data to quantify the effect of GRE, GPA, and college rank on admission probability. We will conduct this analysis by answering the follwing questions:
+
+**Question 1:** Examine the data and conduct EDA.
+
+```{r warning=FALSE,message=FALSE}
+library(car) #importing libraries
+library(ggplot2)
+library(dplyr)
+library(Hmisc)
+library(knitr)
+```
+
+```{r}
+admission <- read.csv("data_wk02.csv") #import data
+```
+
+```{r}
+str(admission) #Want to understand variable data types, dimensions, etc.
+```
+
+```{r}
+head(admission) #look at first 5 rows of dataframe
+```
+
+
+```{r}
+#confirm var types and note that I need to change gpa to "int" for modeling
+sapply(admission, class) 
+```
+
+```{r}
+#review missing data, range per variable, number of distinct values per variable
+describe(admission) 
+```
+
+```{r}
+#calculate the count and proportion of my predictor variable; note almost 7:3 split 
+#for Not Admitted to Admitted
+table(admission$admit) 
+prop.table(table(admission$admit))
+```
+
+\newpage
+
+```{r}
+prop.table(table(admission$rank)) #review proportion of rank values
+```
+
+
+```{r}
+summary(admission) #review high-level statistics for independent variables
+```
+
+\newline
+
+Note the outliers for gre and gpa. There appear to be 2 outliers in gre data and one outlier in gpa.
+
+```{r fig.height = 5, fig.width = 3, fig.align='center'}
+
+
+boxplot(admission$gre, main="gre", col=c("orange")) 
+
+boxplot(admission$gpa, main="gpa", col=c("green"))
+
+```
+
+\newpage
+
+Review spread of GRE scores with density line. We can see the outlier at ~ 225 and high frequency of perfect scores (800).
+```{r}
+ggplot(admission, aes(x=gre)) + ggtitle("GRE Distribution") +
+    geom_histogram(aes(y=..density..),     
+                   binwidth=10,
+                   colour="black", fill="white") +
+    geom_density(alpha=.2, fill="#FF6666") 
+```
+
+\newpage
+
+Reviewing the spread of Grade Point Average's. Red dotted line indicates mean for GPA. Slight left-skewed histogram.
+```{r}
+ggplot(admission, aes(x=gpa)) + ggtitle("GPA Distribution and Mean") +
+    geom_histogram(binwidth=.05, colour="steel blue", fill="white") +
+    geom_vline(aes(xintercept=mean(gpa)),  
+               color="red", linetype="dashed", size=1)
+```
+
+\newpage
+
+Comparing GRE Score to being admitted. Interesting that the spread of GRE scores is similar between Not Admitted and Admitted. Even students who receive perfect or near pefect score are sometimes not admitted.
+```{r}
+ggplot(admission, aes(factor(admit), gre)) +
+  geom_boxplot(aes(fill = factor(admit))) + 
+  geom_jitter() +
+  ggtitle("Admission Based on GRE Score") + 
+  theme(plot.title = element_text(lineheight=1, face="bold")) 
+
+```
+
+\newpage
+
+In order to view GPA against Admit, I first binned GPA into three buckets of GPA values: 0-2, 2-3, and 3+.
+
+\newline
+
+```{r}
+admission$bin <- cut(admission$gpa, c(0,2,3,4))
+table(admission$bin)
+```
+
+\newline
+
+We can see that the spread of Not Admitted to Admitted is similar for all GPA's, even among students with low GPA's.
+
+```{r}
+ggplot(admission, aes(factor(admission$bin), admit)) +
+  geom_boxplot(aes(fill = factor(admission$bin))) + 
+  geom_jitter() +
+  ggtitle("Admission Based on GPA Score") + 
+  theme(plot.title = element_text(lineheight=1, face="bold")) 
+```
+
+\newpage
+
+Below we see the range of Rank values is similarly spread between Not Admitted and Admitted.
+
+Since the spread of the predictor variables is similar across Not Admitted and Admitted, it begs the question how much does each variable contribute when determining probability of being admitted to graduate school or not?
+
+\newline
+
+```{r}
+
+ggplot(admission, aes(factor(admit), rank)) +  
+  geom_boxplot(aes(fill = factor(admit))) + 
+  geom_jitter() +
+  ggtitle("Admission by Rank Level") + 
+  theme(plot.title = element_text(lineheight=1, face="bold")) 
+```
+
+\newpage
+
+**Question 2:** Estimate a binary logistic regression using the following set of explanatory variables: $gre$, $gpa$, $rank$, $gre^2$, $gpa^2$, and $gre \times gpa$, where $gre \times gpa$ denotes the interaction between $gre$ and $gpa$ variables.
+
+This is the model that will be used.
+$$
+logit \left( \pi_i \right)  = log \left( \frac{\pi_i}{1 - \pi_i} \right) = \beta_0 + \beta_1 x_{i1} + \dots + \beta_K x_{iK}
+$$
+
+```{r}
+admission$gpa <- as.integer(admission$gpa) #change gpa to var type "int" for modeling
+
+sapply(admission, class)
+```
+
+\newline
+
+First, Rank needs to be factored for modeling so that we can see the estimates for Rank 1, 2, 3, or 4.
+
+\newline
+
+```{r}
+#Originally I factored Rank so that the model would be more objective to the Rank values of 1-4;
+#however, the output looked terrible so I commented it out and re-ran model
+
+#admission$rank <- factor(admission$rank) 
+
+```
+
+\newline
+
+```{r}
+mod.a <- glm(formula = admit ~ gre + gpa + rank + I(gpa^2) + I(gre^2) + gre:gpa, family = binomial(link=logit), data = admission)
+
+summary(mod.a)
+```
+
+**ANSWER**
+
+This model seems to include the "kitchen sink" in terms of independent variables. The only variable with a p-value of < $0.05$ is Rank. Given the significantly high p-values for the other variables makes me want to run a "stepped" version of the model, meaning I would model using only one variable at a time, then add +1. 
+
+\newline
+
+**Question 3:** Test the hypothesis that GRE has no effect on admission using the likelihood ratio test.
+
+The forumla that will be used: 
+
+$$
+-2log(\Lambda)  = -2 \sum_{i=1}^{n} y_ilog \left( \frac{\hat{\pi_1(0)}}{y_i} \right) + (1-y_i)log \left( \frac{1-\hat{\pi_1(0)}}{1-y_i} \right)
+$$
+$H_0: \beta_k = 0$
+$H_a: \beta_k \ne 0$
+
+
+```{r}
+mod.Ho <- glm(formula = admit ~ gpa + rank, family = binomial(link=logit), data = admission)
+
+mod.Ha <- glm(formula = admit ~ gre + gpa + rank, family = binomial(link=logit), data = admission)
+
+summary(mod.Ha)
+```
+
+Forumula for Likelihood Ration Tests:
+\begin{align*}
+-2log(\Lambda) &= -2log\left( \frac{L(\hat{\mathbf{\beta}}^{(0)} | y_1, \dots, y_n)}{L(\hat{\mathbf{\beta}}^{(a)} | y_1, \dots, y_n)}
+\right) \\
+&= -2\sum y_i log\left( \frac{\hat{\pi}_i^{(0)}}{\hat{\pi}_i^{(a)}} \right) + (1 - y_i ) log\left( \frac{1- \hat{\pi}_i^{(0)}}{1- \hat{\pi}_i^{(a)}} \right)
+\end{align*}
+
+```{r}
+Anova(mod.Ha, test="LR")
+```
+
+
+```{r}
+anova(mod.Ho, mod.Ha, test = "Chisq")
+```
+
+**ANSWER**
+
+At 95% confidence level, the null hypothesis that GRE scores have no role in determining whether a student is admitted to grad school or not should be rejected. There is strong evidence to support that GRE is important when determining Admitted vs Not Admitted (given that the model includes GPA and Rank).
+
+\newline
+
+**Question 4:** What is the estimated effect of college GPA on admission?
+
+```{r}
+mod.Ho1 <- glm(formula = admit ~ gre + rank, family = binomial(link=logit), data = admission)
+
+mod.Ha1 <- glm(formula = admit ~ gre + gpa + rank, family = binomial(link=logit), data = admission)
+
+summary(mod.Ha1)
+
+```
+
+```{r}
+Anova(mod.Ha1, test="LR")
+```
+
+
+```{r}
+anova(mod.Ho1, mod.Ha1, test = "Chisq")
+```
+
+**ANSWER**
+GPA has some effect on admission but not much. A one point increase in GPA results in an increase of $0.27$.
+
+\newline
+
+**Question 5:** Construct the confidence interval for the admission probability for the students with $GPA = 3.3$, $GRE = 720$, and $rank=1$.
+
+Formulas beings used for Wald Confidence Interval: 
+
+$$
+\hat{\beta_k} \pm Z_{1-\alpha/2} \sqrt{\widehat{Var}(\hat{\beta}_k)}
+$$
+
+$$
+exp \left( \hat{\beta_k} \pm Z_{1-\alpha/2} \sqrt{\widehat{Var}(\hat{\beta}_k)} \right)
+$$
+
+```{r}
+newdf <- data.frame(gpa = 3.3, gre = 720, rank = 1)
+
+predict(object = mod.Ha, newdata = newdf, type = "link")
+
+predict(object = mod.Ha, newdata = newdf, type = "response")
+```
+
+```{r}
+alpha <- 0.05
+
+lin.pred <- predict(object = mod.Ha, newdata = newdf, type = "link", se = TRUE)
+
+lin.pred
+```
+
+```{r}
+pi.hat <- exp(lin.pred$fit) / (1 + exp(lin.pred$fit))
+
+CI.lin.pred <- lin.pred$fit + qnorm(p = c(alpha/2, 1-alpha/2)) * lin.pred$se.fit
+
+CI.pi <- exp(CI.lin.pred) / (1 + exp(CI.lin.pred))
+
+(data.frame(newdf, pi.hat, lower = CI.pi[1], upper = CI.pi[2]))
+      
+```
+
+**ANSWER**
+For students with $GPA = 3.3$, $GRE = 720$, and $rank=1$, their admission probability is $61.3\%$. The confidence interval is between $50\%$ to $71.5\%$.
+
+
+
+
+

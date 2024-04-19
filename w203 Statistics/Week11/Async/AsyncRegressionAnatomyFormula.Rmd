@@ -1,0 +1,56 @@
+---
+title: "Applying the Regression Anatomy Formula"
+author: 'w203: Statistics for Data Science'
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Open R and verify that the mtcars dataset is automatically loaded.
+
+```{R}
+head(mtcars)
+```
+
+You are interested in the following model:
+
+\begin{center}$mpg = \beta_0+\beta_1hp+\beta_2wt+u$\end{center}
+
+Your task is to figure out what the ols estimate for $\beta_1$ would be, without conducting a multiple regression in R, instead only relying on simple regressions.
+
+Applying the regression anatomy formula,
+
+\begin{center}$\hat{\beta_1}=\frac{\hat{cov}(y,r_1)}{\hat{var}(r_1)}$\end{center}
+
+where $r_1$ is the residual from a regression of hp on wt.
+
+1. Use R to compute the residuals $r_1$, then compute the numerator of the regression anatomy formula.
+
+```{R}
+y = mtcars$mpg
+x1 = mtcars$hp
+x2 = mtcars$wt
+model = lm(x1~x2)
+r1 = model$residuals
+num = cov(y,r1)
+num
+```
+
+2. Compute the denominator of the regression anatomy formula.
+
+```{R}
+den = var(r1)
+den
+```
+
+3. Explain, in a sentence or two, why this method works to compute $\beta_1$.
+
+```{R}
+num/den
+```
+The key point to understand is that the residuals from regressing hp on wt are the important signal. We're used to thinking of residuals as noise, but in this case they represent the unique variation in hp, and that's what ols regression needs to work.
+
+
+

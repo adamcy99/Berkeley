@@ -1,0 +1,133 @@
+---
+title: 'w203 Lab2: Probability Theory'
+author: "Adam Yang"
+date: "6/21/2018"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# 4) Circles, Random Samples, and the Central Limit Theorem
+
+**Parts a, b, and c are handwritten**
+
+  d. Now let n = 100. Using the Central Limit Theorem, compute the probability that $\bar{D}$ is larger than 3/4. Make sure you explain how the Central Limit Theorem helps you get your answer.
+  
+  **Answer:**
+  
+  Let $X_1$, $X_2$, ..., $X_n$ be a random sample from a distribution with mean, $\mu$ and variance, $\sigma^2$. The Central Limit Theorem states that if sample size, n is large enough, the distribution of sample means, $\bar{X}$, has approximately a normal distribution with $\mu_{\bar{X}} = \mu$ and $\sigma_{\bar{X}} = \frac{\sigma}{\sqrt{n}}$. 
+  
+  Therefore, by applying the Central Limit Theorem, the distribution of $\bar{D}$ has a mean of $\mu_{\bar{D}} = \mu = \frac{\pi}{4}$ and a standard deviation of $\sigma_{\bar{D}} = \frac{\sigma}{\sqrt{n}} \approx \frac{0.4105}{\sqrt n}$.
+  
+  We can subtract the $\mu$ from the sample mean and then divide the result by $\frac{\sigma}{\sqrt{n}}$ to get the standard normal variable, otherwise known as the Z-value:
+  \begin{center}$Z=\frac{\bar{D}-\mu}{\sigma/\sqrt n}$\end{center}
+  \begin{center}$Z=\frac{\frac{3}{4}-\frac{\pi}{4}}{0.4105/\sqrt{100}}$\end{center}
+  
+  By finding pnorm(Z), we will know the probability that $\bar{D}$ is less than 3/4. By subtracting that number from 1, we will know the probability that $\bar{D}$ is larger than 3/4.
+  
+```{R}
+# list variables
+miu <- pi/4
+sigma <- sqrt(pi/4-(pi/4)^2)
+D_bar <- 3/4
+n = 100
+# solve for z-value
+z <- (D_bar-miu)/(sigma/sqrt(n))
+# solve for probability that D_bar > 3/4
+1 - pnorm(z)
+``` 
+
+Therefore, the probability that $\bar{D}$ is larger than 3/4 is 0.806.
+
+I should mention that the Central Limit Theorem's rule of thumb for sufficient sample size is anything larger than 30. However, if there is a large skew to the data, the sample size would have to be much larger to be sufficient to approximate a normal distribution of sample means.
+
+  e. Now let n = 100. Use R to simulate a draw for $X_1$, $X_2$, ..., $X_n$ and $Y_1$, $Y_2$, ..., $Y_n$. Calculate the resulting values for $D_1$, $D_2$, ..., $D_n$. Create a plot to visualize your draws, with X on one axis and Y on the other. We suggest using a command like the following to assign a different color to each point, based on whether it falls inside the unit circle or outside it. Note that we pass $d+1$ instead of $d$ into the color argument because 0 corresponds to the color white.
+  
+**Answer:**
+
+```{R}
+n = 100
+# Get samples for X and Y
+X <- runif(n, min = -1, max = 1)
+Y <- runif(n, min = -1, max = 1)
+
+# Compute the samples for D based on X and Y.
+D = c()
+for(i in 1:n) {
+  if(X[i]^2 + Y[i]^2 < 1) {
+    D = c(D,1)
+  } else {
+    D = c(D,0)
+  }
+}
+
+
+# plot x and y, highlight the values where D=1
+plot(X,Y, xlim=c(-1,1), col = D+1, asp =1)
+
+# plot a unit circle
+theta <- seq(0,2*pi,length=100)
+circle <- t(rbind(sin(theta), cos(theta)))
+lines(circle) 
+```
+
+  f. What value do you get for the sample average, $\bar{D}$? How does it compare to your answer in part a?
+  
+  **Answer:**
+  
+```{R}
+mean(D)
+```
+
+The sample average I got is shown above. In part a, I calculated the expectation to be $\frac{\pi}{4}\approx 0.785$. The sample average I calculated above, is close to 0.785, but not as much as I would have liked. I think although we approximated a normal distribution, the distribution is still fairly wide. If we increased our sample size, we would yield a better sample average. This speaks a little bit towards the skew of our Bernoulli distribution. Even though 100 samples is much more than 30, it seems like there is still room for improvement by increasing the sample size even more.
+
+  g. Now use R to replicate the previous experiment 10,000 times, generating a sample average of the $D_i$ each time. Plot a histogram of the sample averages.
+  
+**Answer:**
+
+```{R}
+# Function to get the sample mean of D
+sample_D <- function(n) {
+  # Get samples for X and Y
+  X <- runif(n, min = -1, max = 1)
+  Y <- runif(n, min = -1, max = 1)
+
+  # Compute the samples for D based on X and Y.
+  D = c()
+  for(i in 1:n) {
+    if(X[i]^2 + Y[i]^2 < 1) {
+      D = c(D,1)
+    } else {
+      D = c(D,0)
+    }
+  }
+  return(mean(D))
+}
+
+draws <- replicate(10000, sample_D(100))
+
+hist(draws)
+
+```
+
+  h. Compute the standard deviation of your sample averages to see if it's close to the value you expect from part c.
+  
+**Answer:**
+
+```{R}
+sd(draws)
+```
+
+In part c, we calculated $\sigma_{\bar{D}} = \frac{\sigma}{\sqrt{n}} = \frac{0.4105}{\sqrt{100}} \approx 0.04105$. The standard deviation of our sample averages is shown above. It is within the ballpark of 0.04105, although, like the sample mean, it is not as close as I would have liked. Again, I think the skew of the Bernoulli distribution requires us to use a larger sample size for the Central Limit Theorem to work better.
+
+  i. Compute the fraction of your sample averages that are larger than 3/4 to see if it's close to the value you expect from part d.
+  
+```{R}
+# Calulate the fraction of my sample averages that are larger than 3/4
+length(draws[draws > 3/4])/10000
+```
+
+In part d, I got the probability that $\bar{D}$ is larger than 3/4 to be 0.8057173. From my sample averages, however, the probability that $\bar{D}$ is larger than 3/4 is quite a bit lower than 0.8057173. I believe the reason for this is that a Bernoulli distribution should ideally have a mean of 0.5. However, our calculated expectation is around 0.785 which is quite a bit larger. This suggests there is a skew to the distribution. It is possible that our sample size of 100 is not quite sufficiently large enough to approximate a normal distribution for the sample averages. I believe if we increase the sample size, our sample probability would be closer to our calculated probability.
+

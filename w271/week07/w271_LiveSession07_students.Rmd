@@ -1,0 +1,340 @@
+---
+title: 'Statistical Methods for Discrete Response, Time Series, and Panel Data: Live Session 7 - Time Series Lecture 2'
+author: "Professor Jeffrey Yau"
+output:
+  pdf_document: default
+  html_notebook: default
+  html_document: default
+---
+
+#Main Topics Covered in Lecture 7:
+
+    - Classical Linear Regression Model (CLM) for time series data
+    - Linear time-trend regression
+    - Goodness of Fit Measures (for Time Series Models)
+    - Time-series smoothing techniques
+    - Exploratory time-series data analysis
+    - Autocorrelation function of different time series
+    - Setting up Autoregressive (*AR(p)*) models
+
+#Readings:
+
+**CM2009:** Paul S.P. Cowpertwait and Andrew V. Metcalfe. *Introductory Time Series with R*. Springer. 2009. 
+
+    - Ch. 5.1 – 5.3
+    - Ch. 3.4 Exponential Smoothing (optional, in the sense that I am not going to spend much time on this topic but not in the sense that it is not a useful practial technique.)
+
+**HA:** Rob J Hyndman and George Athanasopoulos. Forecasting: Principles and Practice.
+
+    - Ch.7 “Exponential Smoothing” (optional)
+
+# Agenda for the Live Session
+
+  1. Quiz
+
+  2. Discussion about scheduel
+  
+  3. Homework Presentation
+
+  4. Topics of Discussions
+  
+    - Modeling and forecasting trend and seasonality
+  
+    - Time series models with and without predictors
+
+    - Useful predictors
+    
+      - deterministric time trend
+      
+      - dummy variables - holiday, seasonal dummies
+      
+    - Time Series EDA
+    
+    - Distributed Lags Model
+    
+    - Time Trend Model
+    
+    - Exponential Smoothing
+    
+
+This lecture covers many topics on time series analysis, ranging from using classical linear regression to model time series data, time-trend regression models, exploratory data analysis for time series, smoothing techniques, autocorrelation function to autoregressive models.  One key focus in this course in general and this lecture in particular is to learn the requirements on the data needed a specific technique can be applied and if there is anything we can do to transform the data such that the technique can be applied. 
+
+# Time Series EDA
+
+Start-up Codes:
+```{r, message=FALSE, warning=FALSE}
+# Set working directory
+wd <- "~/Documents/Teach/Cal/w271/course-main-dev/live-session-files"
+setwd(wd)
+
+# Clean up the workspace before we begin
+rm(list = ls())
+
+# install packages:
+#devtools::install_github('hadley/ggplot2')
+#install.packages("plotly")
+
+# Load required libraries
+library(car)
+library(dplyr)
+library(astsa)
+library(forecast)
+library(fpp2)
+library(ggplot2)
+library(plotly)
+
+# Insert the function to *tidy up* the code when they are printed out
+library(knitr)
+opts_chunk$set(tidy.opts=list(width.cutoff=60),tidy=TRUE)
+```  
+
+```{r}
+df <- read.csv("IC4WSA.csv")
+#df <- na.omit(df)
+str(df)
+head(df)
+tail(df)
+```
+
+```{r}
+
+```
+
+
+
+```{r}
+df <- read.csv("IC4WSA.csv")
+#df <- na.omit(df)
+str(df)
+head(df)
+tail(df)
+#View(df)
+
+claims = ts(df[,2], frequency = 52.1429, start = c(1967,1,28))
+str(claims)
+head(claims)
+tail(claims)
+#View(claims)
+
+ggplot(claims, aes(x=time(claims), y=claims)) + 
+  geom_line(colour = "navy", size = 1) +
+  ggtitle("4-Week Moving Average of Initial Claims") +
+  theme(axis.title = element_text(size = rel(1.5)))
+
+claims.post.crisis = ts(claims[time(claims)>=2010])
+
+ggplot(claims.post.crisis, 
+       aes(x=time(claims.post.crisis), y=claims.post.crisis)) + 
+  geom_line(colour = "navy", size = 1) +
+  ggtitle("4-Week Moving Average of Initial Claims") +
+  theme(axis.title = element_text(size = rel(1.5)))
+
+  
+retail = ts(df[,2], frequency = 12, start = c(1992,1), end=c(2007,12))
+str(retail)
+head(retail)
+tail(retail)
+
+ggplot(retail, aes(x=time(retail), y=retail)) + 
+  geom_line(colour = "navy", size = 1) +
+  ggtitle("U.S. Retail Seasonally Adjusted Sales (Millions of Dollar)") +
+  theme(axis.title = element_text(size = rel(1.5)))
+
+str(uschange)
+str(diamonds)
+colnames(uschange)
+str(uschange[, 'Consumption'])
+
+uschange %>%
+  as.data.frame() %>%
+  ggplot(aes(x=Income, y=Consumption)) +
+    ylab("Consumption (quarterly % change)") +
+    xlab("Income (quarterly % change)") +
+    geom_point() +
+    geom_smooth(method="lm", se=FALSE)
+
+autoplot(uschange[,c("Consumption","Income")]) +
+  ylab("% change") + xlab("Year")
+
+uschange %>%
+  as.data.frame() %>%
+  ggplot(aes(x=Income, y=Consumption)) +
+    ylab("Consumption (quarterly % change)") +
+    xlab("Income (quarterly % change)") +
+    geom_point() +
+    geom_smooth(method="lm", se=FALSE)
+```
+
+## Deterministic Linear Time Model
+
+**In a break-out room, do the following exercises:**
+
+  1. Estimate a deterministic linear time trend model using the `claims.post.crisis` data
+  
+  2. Print the summary estimation results
+  
+  3. Make a dataframe that contain the variables week, claims, fitted.values (of the model you just estimated), and the residuals (of the model you just estimated). Call this dataframe `claims.df`
+  
+  4. Print a summary of the `claims.df`
+  
+  5. Plot a time series plot of the initial unemployment claims
+  
+  6. Plot the original series and the estimated trend
+
+```{r}
+# YOUR CODE TO BE HERE
+```
+
+## Quadratic Time Trend Model
+
+In a break-out room, repeat the above exercises but for a quadratic time trend model
+
+
+```{r}
+# YOUR CODE TO BE HERE
+```
+
+## Exponential Time Trend Model
+
+**In a break-out room, repeat the above exercises but for an exponential time trend model**
+
+```{r}
+# YOUR CODE TO BE HERE
+```
+
+## Regression Diagnostic Results
+
+**In a breakout room discuss the following regression diagnostic results. Feel free to modify the code to facilitate your discussion.**
+
+```{r}
+library(car)
+model_diagnostic = function(model) {
+  plot(model)
+  residualPlots(model)  
+}
+
+cal_rmse = function(data, model) {
+  sqrt(mean(data$claims - model$fitted.values))
+}
+
+model_diagnostic(linear.trend.fit)
+model_diagnostic(quadratic.trend.fit)
+model_diagnostic(exp.trend.fit)
+
+cbind(AIC(linear.trend.fit, quadratic.trend.fit, exp.trend.fit),
+      BIC(linear.trend.fit, quadratic.trend.fit, exp.trend.fit),
+      cal_rmse(claims.df , linear.trend.fit),
+      cal_rmse(claims.df2, quadratic.trend.fit),
+      cal_rmse(claims.df3, exp.trend.fit)
+      )
+
+durbinWatsonTest(linear.trend.fit)
+durbinWatsonTest(quadratic.trend.fit)
+durbinWatsonTest(exp.trend.fit)
+```
+
+## Forecast
+
+**In a breakout room discuss the following regression diagnostic results. Feel free to modify the code to facilitate your discussion.**
+
+```{r}
+predict.data = data.frame(x = seq(457, 512, 1), x2 = seq(457, 512, 1)^2)
+
+linear.predict = linear.trend.fit$coefficients[1] + linear.trend.fit$coefficients[2]*predict.data$x 
+
+quadratic.predict = quadratic.trend.fit$coefficients[1] + quadratic.trend.fit$coefficients[2]*predict.data$x + 
+quadratic.trend.fit$coefficients[3]*predict.data$x2
+
+exp.predict = exp(exp.trend.fit$coefficients[1] + exp.trend.fit$coefficients[2]*predict.data$x)
+
+dump = data.frame(predict.data[1], 
+                  linear.predict, quadratic.predict, exp.predict)
+
+ggplot(data = dump, aes(x=seq(1, 512), y=value, colour=variable)) +
+  ylab('Values') +
+  geom_line(aes(y=linear.predict)) +
+  geom_line(aes(y=quadratic.predict)) +
+  geom_line(aes(y=exp.predict))
+
++
+  ggtitle("4-Week Moving Average of Initial Claims") +
+  theme(title = element_text(size = rel(1.25)),
+        legend.position = "bottom")
+
+```
+
+
+# Modeling and Forecasting Seasonality
+
+Seasonality arises from links of technologies, preferences, and institutions to the calendar.
+
+A key technique for modeling seasonality is regression on seasonal dummy variables.
+
+$$
+  y_t = \sum_{i=1}^s \gamma_i D_{it} + \epsilon_t
+$$
+
+Incorporating holidays:
+
+$$
+  y_t = \sum_{i=1}^s \gamma_i D_{it} + \sum_{i=1}^v \gamma_i^{HD} HDV_{it}  + \epsilon_t
+$$
+where $HDV_{it}$ denotes relevant holiday variables, and there are $v$ of them.
+
+Incorporating both Trend and Seasonality in a model:
+
+$$
+  y_t = \beta_1 TIME_t + \sum_{i=1}^s \gamma_i D_{it} + \epsilon_t
+$$
+
+
+## Examples
+
+```{r}
+ggseasonplot(a10, year.labels=TRUE, year.labels.left=TRUE) +
+  ylab("$ million") +
+  ggtitle("Seasonal plot: antidiabetic drug sales")
+
+ggsubseriesplot(a10) +
+  ylab("$ million") +
+  ggtitle("Seasonal subseries plot: antidiabetic drug sales")
+
+beer2 = window(ausbeer, start=1992)
+  str(beer2)
+  head(beer2)
+  tail(beer2)
+
+autoplot(beer2) + xlab("Year") + ylab("Megalitres")
+```
+
+
+We want to forecast the value of future beer production. We can model this data using a regression model with a linear trend and quarterly dummy variables
+
+```{r}
+fit.beer <- tslm(beer2 ~ trend + season)
+summary(fit.beer)
+```
+
+Note that `trend` and `season` are not objects in the R workspace; they are created automatically by `tslm()` when specified in this way.
+
+```{r}
+autoplot(beer2, series="Data") +
+  autolayer(fitted(fit.beer), series="Fitted") +
+  xlab("Year") + ylab("Megalitres") +
+  ggtitle("Quarterly Beer Production")
+
+predict.time = data.frame(intercept=c(1,1,1,1,1,1,1,1,1,1,1,1),
+  trend= seq(max(fit.beer$model['trend'])+1, max(fit.beer$model['trend'])+12,1),
+season2 = c(0,0,1,0,0,0,1,0,0,0,1,0),
+season3 = c(1,0,0,0,1,0,0,0,1,0,0,0),
+season4 = c(0,1,0,0,0,1,0,0,0,1,0,0))
+
+predict.beer = fit.beer$coefficients[1]*predict.time[1] + 
+  fit.beer$coefficients[2]*predict.time[2] + 
+  fit.beer$coefficients[3]*predict.time[3] +
+fit.beer$coefficients[4]*predict.time[4] +
+  fit.beer$coefficients[5]*predict.time[5]
+predict.beer.ts = ts(predict.beer)
+autoplot(predict.beer.ts)
+```
+

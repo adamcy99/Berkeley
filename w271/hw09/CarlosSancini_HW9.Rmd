@@ -1,0 +1,163 @@
+---
+title: 'W271 Homework 9'
+author: "Carlos Sancini"
+geometry: margin=1in
+output:
+  pdf_document: null
+  number_sections: yes
+  html_document: default
+  toc: yes
+fontsize: 11pt
+---
+
+# Develop a Vector Autoregressive Model:
+
+Use series `series01_liveSession_wk10.csv` and build a VAR model. You will have to examine the data, conduct EDA, use `VARselect` to choose a model that minimize `SC` (which is also `BIC`), estimate the chosen model, conduct residual diagnostic, test model assumptions, and make a 3-step ahead forecast.
+
+Setup code:
+
+```{r global_options, include=FALSE}
+library(knitr)
+opts_chunk$set(tidy.opts=list(width.cutoff=60),tidy=TRUE,warning=FALSE, message=FALSE)
+```
+
+Load required libraries:
+
+```{r, message=FALSE, warning=FALSE}
+
+# Clean up the workspace before we begin
+rm(list = ls())
+
+# Load required libraries
+library(car)
+library(dplyr)
+library(Hmisc)
+library(gridExtra)
+library(forecast)
+library(fpp2)
+library(astsa)
+library(xts)
+library(vars)
+
+# Set working directory
+wd = "D:\\GDrive\\W271\\repo\\hw\\hw09"
+setwd(wd)
+
+```
+
+
+Load dataset, convert to time series and analyze structure:
+
+```{r}
+df = read.csv("series01_liveSession_wk10.csv", encoding = "UTF-8", header = TRUE, sep=",")
+
+# Examine the data structure
+rbind(head(df, 5), some(df, 5), tail(df, 5))
+str(df)
+describe(df)
+
+# convert to time series
+xts_idx = seq(as.Date("2005/1/1"), by = "month", length.out = nrow(df))
+ts = ts(df, start = c(2005,1), frequency = 12)
+head(ts)
+tail(ts)
+
+autoplot(ts, facets=TRUE) + xlab("Year") + ggtitle("Series 1 & 2 Plots")
+
+
+```
+
+EDA:
+
+Autocorrelation analisys
+
+```{r}
+
+# check autocorrelation
+a1 = ggAcf(ts[,1], lag=24) +
+  ggtitle("Series 1")
+
+# check partial autocorrelation
+a2 = ggPacf(ts[,1], lag=24) +
+  ggtitle("Series 1")
+
+# check autocorrelation
+a3 = ggAcf(ts[,2], lag=24) +
+  ggtitle("Series 2")
+
+# check partial autocorrelation
+a4 = ggPacf(ts[,2], lag=24) +
+  ggtitle("Series 2")
+
+grid.arrange(a1, a2, a3, a4, ncol=2)
+
+```
+
+Seasonality analisys
+
+```{r}
+# check for seasonality
+sb1 = ggplot() + 
+  ggtitle("Seasonal boxplot: Series 1 & 2") +
+  geom_boxplot(mapping = aes(x = factor(cycle(ts[,1])), y = ts[,1]), color="black", fill="gray") +
+  labs(x = "", y =  "") +
+  scale_y_continuous(expand = c(0,0))
+sb2 = ggplot() +
+  geom_boxplot(mapping = aes(x = factor(cycle(ts[,2])), y = ts[,2]), color="black", fill="gray") +
+  labs(x = "Month", y =  "") +
+  scale_y_continuous(expand = c(0,0))
+grid.arrange(sb1, sb2, ncol=1)
+```
+
+Contemporaneous correlation analisys
+
+```{r}
+scatterplotMatrix(~ ts[,1] + ts[,2])
+title("Contemporaneous Correlation of Series 1 & 2")
+```
+
+```{r}
+
+cat("Correlation Matrix: ", cor(ts[,1],ts[,2]))
+
+ccf(ts[,1],ts[,2])
+
+```
+
+
+MODEL SELECTION:
+
+```{r}
+VARselect(ts, lag.max = 8, type = "both")
+```
+
+```{r}
+var.fit = VAR(ts, p = 1, type = "both")
+summary(var.fit)
+```
+
+```{r}
+roots(var.fit)
+```
+
+DIAGNOSTIC TESTING: 
+
+```{r}
+# Test of normality: null hypothesis = normally distributed
+normality.test(var.fit, multivariate.only = TRUE)
+
+# Test of no serial correlation: null hypothesis = no serial correlation
+serial.test(var.fit, lags.pt = 12, type = "PT.asymptotic")
+#plot(var.fit.ptasy)
+
+# Test of the absence of ARCH effect: null hypothesis = homoscedastic
+arch.test(var.fit)
+```
+
+FORECAST: 
+
+```{r}
+forecast(var.fit) %>% autoplot() + 
+  ggtitle("VAR model forecast") +
+  labs(x = "Year", y =  "") 
+```

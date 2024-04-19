@@ -1,0 +1,5 @@
+foo	5
+quux	9
+labs	100
+bar	5
+qi	1

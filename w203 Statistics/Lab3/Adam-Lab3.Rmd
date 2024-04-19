@@ -1,0 +1,70 @@
+---
+title: 'Lab 3: Reducing Crime'
+author: 'w203: Statistics for Data Science'
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{R}
+setwd("~/Desktop/w203 Statistics for Data Science/Lab3/")
+crime_df <- read.csv("crime_v2.csv")
+crime_df <- crime_df[-c(92,93,94,95,96,97), ]
+crime_df$prbconv <- as.numeric(as.character(crime_df$prbconv))
+```
+
+```{R}
+summary(crime_df)
+```
+
+```{R}
+for (col in 3:ncol(crime_df)) {
+    hist(crime_df[,col], main = colnames(crime_df[col]), xlab = colnames(crime_df[col]))
+}
+```
+```{R}
+for (col in c(3,4,5,7,8,9,10,19,24,25)) {
+    hist(log(crime_df[,col]), main = colnames(crime_df[col]), xlab = colnames(crime_df[col]))
+}
+```
+
+```{R}
+library(GGally)
+ggpairs(crime_df[,c(4,5,6,8)])
+```
+
+```{R}
+ggpairs(crime_df[,8:10])
+```
+
+```{R}
+plot(lm(crime_df$prbarr~crime_df$polpc))
+```
+
+```{R}
+temp <- crime_df[-c(51), ]
+plot(lm(log(temp$polpc)~log(temp$prbarr)))
+plot(temp$prbarr, temp$polpc)
+```
+
+```{R}
+
+for (col in 15:24) {
+    plot(crime_df$taxpc, crime_df[,col], main = colnames(crime_df[col]), ylab = colnames(crime_df[col]))
+}
+
+plot(lm(crime_df$taxpc~crime_df$wfir))
+
+#row 25 has high tax pc. too high
+```
+
+
+```{R}
+plt <- boxplot(crime_df$wser)
+text(plt$group,                                              # the x locations 
+     plt$out,                                                # the y values
+     rownames(vv)[which(vv == bxpdat$out, arr.ind=TRUE)[, 1]]
+     pos = 4)
+```

@@ -1,0 +1,293 @@
+---
+title: 'w271: Homework 2 (Due: Week 3) with Suggested Solutions'
+author: "Professor Jeffrey Yau"
+geometry: margin=1in
+output:
+  pdf_document: null
+  number_sections: yes
+  html_document: default
+  toc: yes
+fontsize: 11pt
+---
+
+# Due: Before the Live Session of Week 3
+
+# Instructions (Please Read it Carefully!):
+
+*  $\textbf{Page limit of the pdf report: None, but please be reasonable}$
+* Page setup: 
+  * Use the following font size, margin, and linespace:
+    * fontsize=11pt
+    * margin=1in
+    * line_spacing=single
+
+* Submission:
+    * Homework needs to be completed individually; this is not a group project. 
+    * Each student submits his/her homework to the course github repo by the deadline; submission and revision made after the deadline will not be graded
+    * Submit 2 files:
+        1. A pdf file that details your answers. Include all the R codes used to produce the answers. *Please do not suppress the codes in your pdf file.*
+        2. R markdown file used to produce the pdf file
+    * Use the following file-naming convensation; fail to do so will receive $10\%$ reduction in the grade:
+        * StudentFirstNameLastName_HWNumber.fileExtension
+        * For example, if the student's name is Kyle Cartman for homework 1, name your files as
+            * KyleCartman_HW1.Rmd
+            * KyleCartman_HW1.pdf
+    * Although it sounds obvious, please write your name on page 1 of your pdf and Rmd files.
+
+    * For statistical methods that we cover in this course, use only the R libraries and functions that are covered in this course. If you use libraries and functions for statistical modeling that we have not covered, you have to  (1) provide an explanation of why such libraries and functions are used instead and (2) reference to the library documentation. **Lacking the explanation and reference to the documentation will result in a score of zero for the corresponding question.** For data wrangling and data visualization, you are free to use other libraries, such as dplyr, ggplot2, etc.
+
+  * For mathematical formulae, type them in your R markdown file. **Do not write them on a piece of paper, snap a photo, and either insert the image file or sumbit the image file separately. Doing so will receive a $0$ for that whole question.**
+
+  *  Students are expected to act with regards to UC Berkeley Academic Integrity.
+
+
+\newpage
+In the live session of week 2, we discussed data analysis, EDA, and binary logistic regression.  This homework is designed to review and practice these concepts and techniques. It also covers variable transformation and associated concepts covered in week 3.
+
+For this homework, you will use the dataset *"data_wk02.csv"*, which contains a small sample of graduate school admission data from a university. The variables are specificed below:
+
+  1. admit - the depenent variable that takes two values: $0,1$ where $1$ denotes *admitted* and $0$ denotes *not admitted*.
+  
+  2. gre - GRE score
+  
+  3. gpa - College GPA
+  
+  4. rank - rank in college major
+
+As some students had questions about "rank" in college major, I want to explain it more. THe variable `rank` represents the "rank", in terms of category, in within a major. Note that these "ranks" are not purely based on GPA within the major; they are also based on students' extra-curricular activities. They are not a prefect preditor of graduate school admission.
+
+Suppose you are hired by the University's Admission Committee and are charged to analyze this data to quantify the effect of GRE, GPA, and college rank on admission probability. We will conduct this analysis by answering the follwing questions:
+
+**Question 1:** Examine the data and conduct EDA.
+```{r}
+rm(list = ls())
+library(knitr)
+opts_chunk$set(tidy.opts=list(width.cutoff=60),tidy=TRUE)
+
+library(car)
+require(dplyr)
+library(Hmisc)
+
+path <- "~/Documents/Teach/Cal/w271/course-main-dev/hw/hw02/soln/"
+#path <- "~/Documents/Teach/Cal/w271/_2018.03_Fall/hw/hw02/"
+setwd(path)
+
+df <- read.csv("~/Documents/Teach/Cal/w271/course-main-dev/hw/hw02/data_wk02.csv", stringsAsFactors = FALSE, header = T, sep = ",", row.names = 1)
+str(df)
+describe(df)
+
+table(df$admit)
+```
+
+The data set, imported into R as a data.farme called *df*, contains $400$ observations and $4$ variables.
+  - None of the variables has missing values
+  - Both GRE and GPA are a numeric variables
+  - rank is an ordinal variable
+  - *admit*, which is a binary variable taking values of 0 and 1, is our dependent (or target) variable
+  - all the other three variables, *GRE, GPA, rank*, are potential explanatory variables
+
+# Univariate Exploratory Data Analysis
+```{r}
+#crosstab(df$admit, row.vars = "0/1", col.vars = "Admit", type = "f")
+
+# Dependent variable: admit
+table(df$admit)
+prop.table(table(df$admit))
+
+# Explanatory Variables:
+plot_hist = function(data, var, title) {
+  bw = diff(range(var)) / (2 * IQR(var) / length(var)^(1/3))
+  p <- ggplot(data, aes(var))
+  p + geom_histogram(fill="navy", bins=bw) + ggtitle(title) + theme(plot.title = element_text(lineheight=1, face="bold")) 
+}
+
+# Explanatory Variable: GRE
+plot_hist(data=df, var=df$gre,title="GRE")
+
+# Explanatory Variable: GPA
+plot_hist(data=df, var=df$gpa,title="GPA")
+
+# Explanatory Variable: rank
+table(df$rank)
+round(prop.table(table(df$rank)),2)
+
+```
+
+**Dependent Variable: admit**
+
+The dependent variable, *admit*, is a binary variable taking only values from $0$ or $1$. Out of $400$ students, $237$ (or $68.25\%$) are not admitted and $127$ (or $31.75\%$) are admitted.
+
+**Explanatory Variables: GRE and GPA**
+
+The variable, *GRE*, is a numeric variable that is slightly left-skewed with a mass of observations at $800$. For this exercise, I will not transform this variable or bin out the observations at $800$. I discussed some of the binning strategies in class.
+
+The variable, *GPA*, is a numeric variable that is left-skewed, with most of the values falling above the value $3.0$ and a mass of observations at $4.0$. At this point of the analysis, I will not decide whether or not transformation will be conducted.
+
+# Bivariate Exploratory Data Analysis
+```{r}
+plot_box = function(data,x,y,title) {
+  ggplot(data, aes(factor(x), y)) +  
+  geom_boxplot(aes(fill = factor(x))) + 
+  geom_jitter() +
+  ggtitle(title) + 
+  theme(plot.title = element_text(lineheight=1, face="bold")) 
+}
+
+# Admit and GRE
+plot_box(df, x=df$admit, y=df$gre, title="Figure 1: Admission Status by GRE")
+
+# Admit and GPA
+plot_box(df, x=df$admit, y=df$gpa, title="Figure 2: Admission Status by GPA")
+
+# Admit and Rank
+xtabs(~ df$admit + df$rank)
+round(prop.table(xtabs(~ df$admit + df$rank),2),2)
+
+# GRE and GPA
+p <- ggplot(df, aes(gpa, gre))
+p + geom_point() +
+  ggtitle("Figure 3: GRE vs GPA") + 
+  theme(plot.title = element_text(lineheight=1, face="bold")) 
+
+# GRE and Rank
+plot_box(df, x=df$rank, y=df$gre, title="Figure 4: GRE by Rank")
+
+# GPA and Rank
+plot_box(df, x=df$rank, y=df$gpa, title="Figure 5: GPA by Rank")
+```
+
+From the bivariate analysis, students who were admitted, not surprisingly, tend to have higher GPA and GPA (Figure 1 and 2), and students who had higher GPA also tended to have higher GRE scorer, as shown in Figure 3. I said "tend to" because there were admitted students who had low GPA. In fact, taking pretty much any value of GPA, there were students who were admitted and students who did not.
+
+There also a strong bivariate relationship between rank and admit: as the rank went down, admission rate also went down, as shown in the two frequency tables. However, while students with higher rank (i.e. lower rank value - e.g. rank 1 is "higher" than rank 2) had higher a GRE score (Figure 4), but there was no clear relationship between rank and GPA (Figure 5), disputing the fact that rank is a monotonic function of GPA. 
+
+# Multivariate Exploratory Data Analysis
+```{r}
+# GRE, GPA, and Rank
+p <- ggplot(df, aes(gpa, gre))
+p + geom_point(aes(colour = factor(rank))) +
+  ggtitle("Figure 6: GRE vs GPA colored by Rank") + 
+  theme(plot.title = element_text(lineheight=1, face="bold")) 
+
+# Admit, GRE, and GPA
+p <- ggplot(df, aes(gpa, gre))
+p + geom_point(aes(colour = factor(admit))) +
+  ggtitle("Figure 7: GRE vs GPA colored by Admit") + 
+  theme(plot.title = element_text(lineheight=1, face="bold")) 
+
+```
+
+From Figure 6, it is not easy to detect whether students with high GPA and GRE also were highly ranked, though students with low GPA and low GRE tended to be in rank 3 and 4.
+
+It is also hard to definitely conclude the position relationship between admission and high GRE and GPA (Figure 7).
+
+**Question 2:** Estimate a binary logistic regression using the following set of explanatory variables: $gre$, $gpa$, $rank$, $gre^2$, $gpa^2$, and $gre \times gpa$, where $gre \times gpa$ denotes the interaction between $gre$ and $gpa$ variables.
+
+```{r}
+admit.glm1 <- glm(admit ~ gre + gpa + rank + I(gre^2) + I(gpa^2) + gre:gpa, family = binomial, data = df)
+summary(admit.glm1)
+
+round(exp(cbind(Estimate=coef(admit.glm1), confint(admit.glm1))),2)
+vcov(admit.glm1)
+```
+
+
+**Question 3:** Test the hypothesis that GRE has no effect on admission using the likelihood ratio test.
+```{r}
+library(stargazer)
+# Estimate the model under the null hypothesis
+admit.glm1.h0 <- glm(admit ~ gpa + rank + I(gpa^2), family = binomial, data = df)
+# Estiamte the modle under the alternative hypothesis
+admit.glm1.h1 <- glm(admit ~ gre + gpa + rank + I(gre^2) + I(gpa^2) + gre:gpa, family = binomial, data = df)
+# Though not required, it's a good practice to display the model results side-by-side
+stargazer(admit.glm1.h0, admit.glm1.h1, type = 'text')
+
+# Test the hypothesis
+anova(admit.glm1.h0,admit.glm1.h1)
+
+anova(admit.glm1.h0,admit.glm1.h1)$Df
+
+# Calculate p-value
+pvalue <- 1 - pchisq(q = anova(admit.glm1.h0,admit.glm1.h1)$Deviance, df = anova(admit.glm1.h0,admit.glm1.h1)$Df)
+pvalue
+```
+
+As p-value = 0.044, which is under 0.05, the hypothesis is rejected.  GRE has no effect on admission in the presence of GPA.
+
+**Question 4:** What is the estimated effect of college GPA on admission?
+
+Since we reject the model under the null hypothesis, we will use the model under the alternative hypothesis for the estimated effect of GPA on admission.
+
+The estimated model is
+$$
+logit(\hat{\pi}) = -7.092 + 0.0185GRE - 0.0080GPA -0.5643rank + 0.0GRE^2 + 0.65GPA^2 - 0.0060GRE*GPA
+$$
+or 
+$$
+\hat{\pi} = exp(-7.092 + 0.0185GRE - 0.0080GPA -0.5643rank + 0.0GRE^2 + 0.65GPA^2 - 0.0060GRE*GPA)
+$$
+
+The estimated effect on the odds of admission when GPA change by $k$ units of GPA is
+$$
+\begin{aligned}
+\widehat{OR} &= \frac{Odds_{GPA + k}}{Odds_{GPA}} \\
+&= \frac{exp(-7.092 + 0.0185GRE - 0.0080(GPA+k) -0.5643rank + 0.0GRE^2 + 0.65(GPA+k)^2 - 0.0060GRE*(GPA+k))}{exp(-7.092 + 0.0185GRE - 0.0080GPA -0.5643rank + 0.0GRE^2 + 0.65GPA^2 - 0.0060GRE*GPA)} \\
+&= exp(-0.0080k + 2 \times 0.65k - 0.0060k*GRE)
+\end{aligned}
+$$
+
+
+Due to the quadratic term associated with GPA and the interaction between GRE and GPA, the estimated effect on admission of GPA is a function of both the GPA and GRE. For instance, for $k=0.5$, $GPA=3.0$, and $GRE=600$, the odds is estimated to increated by 16.6%. Note that the estimated increase in odds of a $0.5\%$ increase in GPA is much larger (i.e. $61.4\%$) for someone with $GPA$ of $3.5$ and $GRE$ of 600.
+
+The calculation is detailed below.
+
+```{r}
+impact_GPA = function(k,GRE,GPA) {
+  exp(admit.glm1.h1$coefficients['gpa']*k + 2*k*admit.glm1.h1$coefficients['I(gpa^2)']*GPA  + admit.glm1.h1$coefficients['gre:gpa']*k*GRE)
+}
+
+impact_GPA(k=0.5, GRE=600, GPA=3.0)
+
+impact_GPA(k=0.5, GRE=600, GPA=3.5)
+
+# Calculate a range of GPA effects, holding GRE=600
+GPA = seq(from = 2.8, to = 4.0, by = 0.1)
+
+data.frame(GPA=GPA,  GRE=600, GPA_effect = impact_GPA(k=0.1, GRE=600, GPA=GPA))
+
+# Calculate a range of GPA effects, holding GRE=750
+GPA = seq(from = 2.8, to = 4.0, by = 0.1)
+
+data.frame(GPA=GPA,  GRE=750, GPA_effect = impact_GPA(k=0.1, GRE=750, GPA=GPA))
+
+```
+
+**Question 5:** Construct the confidence interval for the admission probability for the students with $GPA = 3.3$, $GRE = 720$, and $rank=1$.
+```{r}
+gpa=3.3; gre=720; rank=1
+predict.data = data.frame(intercept=1, 
+                          gre=gre,
+                          gpa=gpa,
+                          rank=rank,
+                          gre_sq = gre^2,
+                          gpa_sq = gpa^2,
+                          gre_gpa= gre*gpa)
+
+predict(object=admit.glm1, newdata=predict.data,type="link")
+pi.hat = predict(object=admit.glm1, newdata=predict.data,type="response")
+round(pi.hat,2)
+library(mcprofile)
+K = matrix(data = c(1,gre,gpa,rank,gre^2,gpa^2,gre*gpa),
+           nrow=1, ncol=length(admit.glm1$coefficients))
+# Calculate -2log(Lambda)
+linear.combo <- mcprofile(object = admit.glm1, CM = K)
+# CI for linear combo 
+ci.logit.profile <- confint(object = linear.combo, level = 0.95)
+# CI for pi.hat
+round(exp(ci.logit.profile$confint)/(1 +
+exp(ci.logit.profile$confint)),4)
+``` 
+For the students with $GPA = 3.3$, $GRE = 720$, and $rank=1$, the $\hat{\pi}=0.57$ (or $57\%$) and the the Profile LR interval is $[0.4373,0.6938]
+
+
+
+

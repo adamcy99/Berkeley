@@ -1,0 +1,152 @@
+---
+title: 'Krysten Thompson - w271: Homework 9 (Due: Week 11)'
+author: "Professor Jeffrey Yau"
+geometry: margin=1in
+output:
+  pdf_document: null
+  number_sections: yes
+  html_document: default
+  toc: yes
+fontsize: 11pt
+---
+
+# Develop a Vector Autoregressive Model:
+
+Use series `series01_liveSession_wk10.csv` and build a VAR model. You will have to examine the data, conduct EDA, use `VARselect` to choose a model that minimize `SC` (which is also `BIC`), estimate the chosen model, conduct residual diagnostic, test model assumptions, and make a 3-step ahead forecast.
+
+```{r, warning=FALSE, message=FALSE}
+
+library(knitr)
+opts_chunk$set(tidy.opts=list(width.cutoff=60),tidy=TRUE)
+```
+
+```{r warning=FALSE, message=FALSE}
+library(car)
+library(dplyr)
+library(Hmisc)
+library(gridExtra)
+library(forecast)
+library(fpp2)
+library(astsa)
+library(xts)
+library(vars)
+```
+
+```{r}
+d <- read.csv("series01_liveSession_wk10.csv", header = TRUE, sep=",")
+```
+
+```{r}
+str(d)
+```
+
+```{r}
+head(d,3)
+tail(d,3)
+```
+
+```{r}
+describe(d)
+```
+
+```{r}
+values = seq(from = as.Date("2000-01-01"), to = as.Date("2009-12-31"), by = 'month')
+```
+
+```{r}
+d$date <- values
+```
+
+```{r}
+head(d)
+```
+
+```{r}
+d <- d[,c(3,1,2)]
+head(d,3)
+```
+
+```{r}
+d.ts <- ts(d)
+head(d.ts)
+```
+
+```{r}
+#Plot series data
+plot.ts(d.ts, main="Plot of Series 1 and Series 2")
+```
+
+```{r}
+idx <- seq(from = as.Date("2019-01-01"), to = as.Date("2019-04-30"), by = 'day')
+```
+
+
+```{r}
+
+# check autocorrelation and partial autocorrelation for each series
+s1 <- ggAcf(d.ts[,2], lag=24) + ggtitle("ACF Series 1")
+
+s1p <- ggPacf(d.ts[,2], lag=24) + ggtitle("PACF Series 1")
+
+s2 <- ggAcf(d.ts[,3], lag=24) + ggtitle("ACF Series 2")
+
+s2p <- ggPacf(d.ts[,3], lag=24) + ggtitle("PACF Series 2")
+
+grid.arrange(s1, s1p, s2, s2p, ncol=2)
+```
+
+```{r}
+scatterplotMatrix(~ d.ts[,2] + d.ts[,3])
+title("Contemporaneous Correlation of Series 1 & 2")
+```
+
+Select optimal number of lags:
+
+```{r}
+#I tested many lag.max (all the way up to 24) and it kept coming back to 1
+VARselect(d.ts, lag.max = 5, type = "both")
+```
+
+
+**In a next step, the VAR model is estimated with the function VAR() and as deterministic regressors a constant is included.**
+
+```{r}
+var.fit <- VAR(d.ts, p = 1, type = "both")
+summary(var.fit)
+```
+
+**The moduli of the eigenvalues of the companion matrix are all less than one.**
+
+```{r}
+roots(var.fit)
+```
+
+# Diagnostic Testing: 
+
+```{r}
+# Test of normality:
+normality.test(var.fit, multivariate.only = TRUE)
+
+# Test of no serial correlation:
+serial.test(var.fit, lags.pt = 12, type = "PT.asymptotic")
+#plot(var.fit.ptasy)
+
+# Test of the absence of ARCH effect:
+arch.test(var.fit)
+```
+
+# Forecast:
+
+```{r}
+forecast(var.fit) %>% autoplot() +
+  ggtitle("Var Model Forecast") + xlab("Year")  + ylab("Value")
+
+```
+
+
+
+
+
+
+
+

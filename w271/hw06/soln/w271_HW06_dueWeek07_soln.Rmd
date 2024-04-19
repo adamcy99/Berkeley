@@ -1,0 +1,194 @@
+---
+title: 'w271: Homework 6 (Due: Week 7) Suggested Solutions'
+author: "Professor Jeffrey Yau"
+geometry: margin=1in
+output:
+  html_document: default
+  number_sections: yes
+  pdf_document: null
+  toc: yes
+fontsize: 11pt
+---
+
+# Due: 4pm Pacific Time on the Day of the Live Session (i.e. Monday) of Week 7
+
+# Instructions (Please Read it Carefully!):
+
+*  $\textbf{Page limit of the pdf report: None, but please be reasonable}$
+* Page setup: 
+  * Use the following font size, margin, and linespace:
+    * fontsize=11pt
+    * margin=1in
+    * line_spacing=single
+
+* Submission:
+    * Homework needs to be completed individually; this is not a group project. 
+    * Each student submits his/her homework to the course github repo by the deadline; submission and revision made after the deadline will not be graded
+    * Submit 2 files:
+        1. A pdf file that details your answers. Include all the R codes used to produce the answers. *Please do not suppress the codes in your pdf file.*
+        2. R markdown file used to produce the pdf file
+    * Use the following file-naming convensation; fail to do so will receive $10\%$ reduction in the grade:
+        * StudentFirstNameLastName_HWNumber.fileExtension
+        * For example, if the student's name is Kyle Cartman for homework 1, name your files as
+            * KyleCartman_HW1.Rmd
+            * KyleCartman_HW1.pdf
+    * Although it sounds obvious, please write your name on page 1 of your pdf and Rmd files.
+
+    * For statistical methods that we cover in this course, use only the R libraries and functions that are covered in this course. If you use libraries and functions for statistical modeling that we have not covered, you have to  (1) provide an explanation of why such libraries and functions are used instead and (2) reference to the library documentation. **Lacking the explanation and reference to the documentation will result in a score of zero for the corresponding question.** For data wrangling and data visualization, you are free to use other libraries, such as dplyr, ggplot2, etc.
+
+  * For mathematical formulae, type them in your R markdown file. **Do not write them on a piece of paper, snap a photo, and either insert the image file or sumbit the image file separately. Doing so will receive a $0$ for that whole question.**
+
+  *  Students are expected to act with regards to UC Berkeley Academic Integrity.
+
+
+\newpage
+In this homework, you are asked to conduct Time Series EDA, develop a Time Trend Model, conduct model diagnostic analysis, and use the model to make forecasts.
+
+Load the file **"bls_unemployment.csv"**
+This file contains the monthly unemployment rate in the United States from January 2007 to January 2017. *Note that these data are NOT seasonally adjusted.*
+
+**1. Load the csv file into a data.frame, calling it `df`, and examine the structure of the "raw" series after you load it into a data.frame.**
+
+I combine the codes for question 1 and 2 together.
+
+**2. Convert it into a R time-series object, and examine the structure of the series after you convert the `df` into a time series object. What is the difference between the two structures?**
+  
+Suppose we want to approximate the unemployment rate between 2010 and 2017 using a linear time trend model. For this exercise, feel free to modify this dataset but be sure that you explain what you did and why.
+
+Start-up codes:
+```{r, warning=FALSE, message=FALSE}
+rm(list = ls())
+
+library(knitr)
+opts_chunk$set(tidy.opts=list(width.cutoff=60),tidy=TRUE)
+
+# Set working directory
+wd <- "~/Documents/Teach/Cal/w271/course-main-dev/hw/hw06/soln"
+setwd(wd)
+
+# Load libraries
+library(skimr)
+library(car)
+library(dplyr)
+library(Hmisc)
+library(ggplot2)
+#library(astsa)
+library(forecast)
+library(fpp2)
+
+# Load the dataset
+df <- read.csv("~/Documents/Teach/Cal/w271/course-main-dev/hw/hw06/bls_unemployment.csv")
+
+# Basic structure of the original dataset
+str(df)
+skim(df$Value)
+describe(df)
+
+head(cbind(df$Year,df$Period, df$Value))
+tail(cbind(df$Year,df$Period, df$Value))
+
+# Covert it to a time-series object
+unemployment.ts = ts(df$Value, frequency = 12, start = c(2007,1))
+
+# Subsetting the time-series to 2019 - 2017 period
+unemployment.ts.post2010 = window(unemployment.ts, start=c(2010,1), end=c(2017,1))
+
+#unemployment.ts.post2010
+```
+
+The orignal raw dataset contains an identity variable `Series.id`, which is a constant equal to `LNU04000000`, two time variables, `Year` and `Period`, which represent year and month, and the actual series representing the U.S. unemployment rate, `Value`.
+
+The series has 121 monthly observations from 2007 January to 2017 January without any missing values in between. The unemployment rate in this period goes as low as $4.3\%$, as high as $10.6\%$, and a median of $7\%$. However, these statistics are not sufficient to characterize the series, which requires the examination of the series using a time-series plot and its dependency structure using ACF and PACF graphs.
+
+
+**3. Conduct EDA on the series.**
+```{r}
+ggplot(unemployment.ts, aes(x=time(unemployment.ts), y=unemployment.ts)) +
+  geom_line(colour = "navy", size = 1) +
+  ggtitle("Unemployment Rate") +
+  theme(axis.title = element_text(size = rel(1.5)))
+ggAcf(unemployment.ts)
+ggPacf(unemployment.ts)
+
+ggplot(unemployment.ts.post2010, aes(x=time(unemployment.ts.post2010), y=unemployment.ts.post2010)) +
+  geom_line(colour = "navy", size = 1) +
+  ggtitle("Unemployment Rate") +
+  theme(axis.title = element_text(size = rel(1.5)))
+ggAcf(unemployment.ts.post2010)
+ggPacf(unemployment.ts.post2010)
+```
+
+
+**4. Create a linear time trend model by regressing the unemployment rate on time. Interpret the model results.** 
+```{r}
+# Create a linear time trend model
+linear.trend.fit = lm(unemployment.ts.post2010 ~ time(unemployment.ts.post2010), data=unemployment.ts.post2010)
+summary(linear.trend.fit)
+
+# The effect on unemployment rate of each month forward
+round(coef(linear.trend.fit)[2]*(time(unemployment.ts.post2010)[2]-time(unemployment.ts.post2010)[1]),4)
+```
+
+According to this model, the unemployment rate is estimated to decline by $0.070\%$ for each month forward. The intercept of the model is not meaningfully interpretable, as it is an estimate of the unemployment rate in year $0$.
+
+**5. Examine the residuals of this model as you would if it were a classical linear model. In addition, generate ACF and PACF plots of the residuals.**
+
+```{r}
+# Plot the original series and an estimated trend
+plot_line = function(data, xvar, yvar, title) {
+  ggplot(data = data, aes(x=xvar, y=yvar, colour=variable)) +
+  xlab('Calendar Year') +
+  ylab('Initial Unemployment Claims (in Thousands)') +
+  geom_line(aes(y=yvar , col='claims')) +
+  geom_line(aes(y=fitted.values, col='Linear Trend Fit')) +
+  ggtitle(title) +
+  theme(title = element_text(size = rel(1)),
+        axis.text.y = element_text(angle = 45, hjust = 1)
+        )	
+}
+
+plot_line(linear.trend.fit.df, linear.trend.fit.df$month, linear.trend.fit.df$unemployment.rate, "Unemployment Rate and Linear Trend")
+
+library(car)
+model_diagnostic = function(model, residuals) {
+  summary(model)
+  plot(model)
+  residualPlots(model)  
+  ggAcf(residuals)
+  ggPacf(residuals)
+}
+
+cal_rmse = function(data, model) {
+  sqrt(mean(data$claims - model$fitted.values))
+}
+
+model_diagnostic(linear.trend.fit, linear.trend.fit$residuals)
+
+cbind(AIC(linear.trend.fit),
+      BIC(linear.trend.fit),
+      cal_rmse(linear.trend.fit.df, linear.trend.fit)
+      )
+durbinWatsonTest(linear.trend.fit)
+```
+
+The residuals of the linear time trend model exhibit temporary dependency, which is evidenced in the ACF graph, PACF graph, and the Durbin Watson test. The normal Q-Q plot of the residuals shows that the residuals do not follow the normal distirbution.
+
+**6. Use this model to predict the unemployment rate in 2018 January (i.e. 12 months from the end of the sample). Do the result make sene? How about a prediction of the unemployment rate in 2020 December?**
+
+```{r}
+predict.data = data.frame(x = seq(2017, 2021, 1/12))
+
+linear.predict = linear.trend.fit$coefficients[1] + linear.trend.fit$coefficients[2]*predict.data$x 
+
+linear.predict.df = data.frame(predict.data, linear.predict)
+
+# The unemployment rate in 2018 January
+round(linear.predict.df$linear.predict[linear.predict.df$x==2018.00],2)
+
+# The unemployment rate in 2020 December
+round(linear.predict.df$linear.predict[linear.predict.df$x>2020.9 & linear.predict.df$x<2021.0],2)
+```
+
+The linear trend model of unemployment rate does not provide sensible prediction, as the predicted unemployment rate continues to trend down. In fact, the predicted unemployment rate goes below $1\%$ by the end of $2020$.
+
+

@@ -1,0 +1,137 @@
+---
+title : 'Krysten Thompson - w271: Homework 3'
+author: "Professor Jeffrey Yau"
+output: 
+  pdf_document:
+  toc: true
+  number_sections: true
+fontsize: 11pt
+geometry: margin=1in
+---
+
+# Some start-up scripts
+```{r, message = FALSE}
+rm(list = ls())
+library(car)
+require(dplyr)
+library(Hmisc)
+library(stargazer)
+
+# Describe the structure of the data, such as the number of
+# observations, the number of variables, the variable names, 
+# and type of each of the variables, and a few observations of each of
+# the variables
+str(Mroz)
+
+# Provide summary statistics of each of the variables 
+describe(Mroz)
+
+# For datasets coming with a R library, we can put "?" in front of a
+# dataset to display, under the help window, the description of the 
+# datasets
+?Mroz
+```
+
+## Question 1:
+Estimate a binary logistic regression with `lfp`, which is a binary variable recoding the participation of the females in the sample, as the dependent variable. The set of explanatory variables includes `age`, `inc`, `wc`, `hc`, `lwg`, `totalKids`, and a quadratic term of `age`, called `age_squared`, where `totalKids` is the total number of children up to age $18$ and is equal to the sum of `k5` and `k618`.
+
+```{r}
+#need to make 'lfp', 'hc', and 'wc' binary; "yes" = 1, "no"= 0
+Mroz = within(Mroz, {
+  .females = ifelse(lfp == 'yes', 1, 0)
+  hc = ifelse(hc == 'yes', 1, 0)
+  wc = ifelse(wc == 'yes', 1, 0)
+})
+
+head(Mroz)     #confirm binarization worked
+```
+
+```{r}
+#create Total Kids var by adding number of kids in two diff variables
+Mroz$totalKids <- Mroz$k5 + Mroz$k618
+#Mroz$totalKids    #needed to make sure it worked but didn't want to waste space by
+                   #showing output
+```
+
+```{r}
+#create Age Squared variable for model
+Mroz$age_squared <- Mroz$age * 2
+#Mroz$age_squared   #checking to make sure it worked
+```
+
+```{r}
+head(Mroz)
+```
+
+$$
+log \left(\frac{\pi}{1-\pi} \right) = \beta_0 + \beta_1 x_1 + \beta_2 x_2 + \beta_3 x_1 \times x_2
+$$
+
+```{r}
+log.fit <- glm(formula = .females ~ age + inc + wc + hc + lwg + totalKids + age_squared, family = binomial(link=logit), data = Mroz)
+summary(log.fit)
+```
+
+## Question 2: 
+Is the age effect statistically significant? 
+
+**Yes and no... the age has a p-value of 0.002 which would indicate some level of significance. However, the coefficient value is only $-0.035$ which is a relatively low value. This low value would reflect age not being statistically significant. Also,the colinearity between 'age' and 'age_squared' results in the 'age_squared' variable showing as NA.**
+
+
+## Questions 3: 
+What is the effect of a decrease in age by $5$ years on the odds of labor force participation for a female who was $45$ years of age.
+
+$$
+OR = exp(c \beta_1 + c \beta_2(2 \times age + c) )
+$$
+```{r}
+#For this calculation, I removed 'age_squared' because of colinearity with 'age'
+
+#linear.pred <- exp(log.fit$coefficients[1] + log.fit$coefficients[2] + log.fit$coefficients[3] + log.fit$coefficients[4] + log.fit$coefficients[5] + log.fit$coefficients[6](45 * age + 5))
+
+#linear.pred
+#as.numeric(exp(linear.pred) / (1 + exp(linear.pred)))
+```
+
+**Note to grader: I know my answer is hack. I couldn't figure out code to calc 1.17 even after scrutinizing the book for over an hour.**
+
+```{r}
+current_age <- 45 * 0.034890
+
+curr_less5 <- 40 * 0.034890
+
+current_age - curr_less5
+```
+
+**The effect of an age decrease from 45 years old to 40 years old results in a 17.445% greater chance that the woman is in the workforce.**
+
+
+## Question 4: 
+Estimate the profile likelihood confidence interval of the probability of labor force participation for females who were $40$ years old, had income equal to $20$, did not attend college, had log wage equal to 1, and did not have children.
+
+```{r}
+library(mcprofile)
+
+K <- matrix(data = c(1, 40, 20, 0, 0, 1, 0, (40*40)), nrow=1, ncol=8, byrow=TRUE)
+
+#K <- matrix(data = c(intercept(1), age(40), inc(20), wc(0),hc(0), lwg(1),
+#                     totalKids(0), age_squared(40*40)), nrow=1, ncol=8,
+#            byrow=TRUE)
+
+# linear.combo <- mcprofile(object = log.fit, CM = K)
+# 
+# ci.logit.prof <- confint(object=linear.combo, level=0.95)
+# 
+# lr.int <- exp(ci.logit.prof$confint)/(1+exp(ci.logit.prof$confint))
+# 
+# kable(data.frame(pi.hat = pi.hat, lr.lower=lr.int$lower,
+#                  lr.upper=lr.int$upper))
+
+```
+**Sorry...I played with this for no less than 2.5 hours and couldn't figure out what was wrong with code.**
+
+**I did find it addressed on this page but still couldn't solve error:**
+**https://rdrr.io/cran/mcprofile/src/R/mcprofile.R**
+
+
+

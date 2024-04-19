@@ -1,0 +1,74 @@
+---
+title : 'w271: Homework 7 (Due: Week 8)'
+author: "Professor Jeffrey Yau"
+output: 
+  pdf_document:
+  toc: true
+  number_sections: true
+fontsize: 11pt
+geometry: margin=1in
+---
+
+# Due: Before the Live Session of Week 8
+
+# Instructions (Please Read it Carefully!):
+
+*  $\textbf{Page limit of the pdf report: None, but please be reasonable}$
+* Page setup: 
+  * Use the following font size, margin, and linespace:
+    * fontsize=11pt
+    * margin=1in
+    * line_spacing=single
+
+* Submission:
+    * Homework needs to be completed individually; this is not a group project. 
+    * Each student submits his/her homework to the course github repo by the deadline; submission and revision made after the deadline will not be graded
+    * Submit 2 files:
+        1. A pdf file that details your answers. Include all the R codes used to produce the answers. *Please do not suppress the codes in your pdf file.*
+        2. R markdown file used to produce the pdf file
+    * Use the following file-naming convensation; fail to do so will receive $10\%$ reduction in the grade:
+        * StudentFirstNameLastName_HWNumber.fileExtension
+        * For example, if the student's name is Kyle Cartman for homework 1, name your files as
+            * KyleCartman_HW1.Rmd
+            * KyleCartman_HW1.pdf
+    * Although it sounds obvious, please write your name on page 1 of your pdf and Rmd files.
+
+    * For statistical methods that we cover in this course, use only the R libraries and functions that are covered in this course. If you use libraries and functions for statistical modeling that we have not covered, you have to  (1) provide an explanation of why such libraries and functions are used instead and (2) reference to the library documentation. **Lacking the explanation and reference to the documentation will result in a score of zero for the corresponding question.** For data wrangling and data visualization, you are free to use other libraries, such as dplyr, ggplot2, etc.
+
+  * For mathematical formulae, type them in your R markdown file. **Do not write them on a piece of paper, snap a photo, and either insert the image file or sumbit the image file separately. Doing so will receive a $0$ for that whole question.**
+
+  *  Students are expected to act with regards to UC Berkeley Academic Integrity.
+
+
+\newpage
+In this homework, you are asked to use `quantmod` to get a time sereis `HOUST` from the Federal website, conduct Time Series EDA, examine seasonality, develop a model that can capture both trend and seasonality in the series, and plot the observed vs fitted value, and use the model to make a 12-step ahead forecast.
+
+
+```{r}
+#install.packages("quantmod") #if you have not installed quantmod
+library(quantmod)
+
+# Use Quantmod to load data
+HOUST = getSymbols('HOUST', src='FRED', auto.assign = F) 
+str(HOUST)
+head(HOUST)
+tail(HOUST)
+
+house.starts = ts(HOUST, frequency = 12, start = c(1959,1))
+# subset your time series to one starting in Januagy 2010
+#house.starts = window() 
+
+# Examine your data
+# YOUR CODE TO BE HERE
+
+# Examine seasonality
+# YOUR CODE TO BE HERE
+
+# Estimate a model with trend, seasonlity, or both
+# YOUR CODE TO BE HERE
+
+# Plot the observed and fitted values
+
+# Make a 12-step ahead (out-of-sample) forecast 
+# That is, forecast from 2018-10-01 to 2019-09-01
+```

@@ -1,0 +1,104 @@
+---
+title: "HW Week 12"
+subtitle: "w203: Statistics for Data Science"
+author: "Adam Yang"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+#OLS Interface
+
+The file videos.txt contains data scraped from Youtube.com.
+
+```{R}
+videos <- read.table("videos.txt", header = TRUE, sep = "\t")
+```
+
+  1. Fit a linear model predicting the number of views (views), from the length of a video (length) and its average user rating (rate).
+
+```{R}
+model <- lm(views~length+rate, data = videos)
+```
+
+  2. Using diagnostic plots, background knowledge, and statistical tests, assess all 6 assumptions of the CLM. When an assumption is violated, state what response you will take.
+  
+**CLM.1 Linear population model**
+  
+Any population distribution could be represented as a linear model plus some error. We don't have to worry about this assumption at the moment because we haven't constrained the error term.
+
+**CLM.2 Random Sampling**
+  
+To check random sampling, we need background knowledge of how the data was collected. Unfortunately, we do not know how these data values were scraped from Youtube so we cannot claim that the sample is totally random.
+
+**CLM.3 No perfect multicollinearity**
+
+Our two variables do not have perfect multicollinearity according to the graph shown below. R would've also alerted us if there was multicollinearity in our model, which it didnt.
+
+```{R}
+plot(videos$rate, videos$length)
+```
+
+**CLM.4 Zero-conditional mean**
+
+```{R}
+plot(model, 1)
+```
+
+Judging by the Residuals vs Fitted graph above, there does not seem to be a clear deviation from the zero conditional mean for any fitted value as the red fitted line sticks pretty close to 0. 
+Notice the clear deviation from zero conditional mean, indicated by the parabolic shape. This means that our coefficients will be biased. There are three different approaches to resolving this issue.
+
+**CLM.5 Homoskedasticity**
+
+From the Residuals vs Fitted graph in CLM.4, we can see that there is a some heteroskedasticity because the data points form a cone shape, starting narrow and becoming wider.
+
+```{R}
+plot(model, 3)
+```
+
+In the Scale-Location graph above, the red fitted line has a positive slope which also shows that there is some heteroskedasticity to our model.
+
+**CLM.6 Normality of Errors**
+
+```{R}
+plot(model, 2)
+````
+
+From the Q-Q plot above, we see that maybe at low values, the residuals are normal, but there seems to be a strong deviation from normality at the right side of the Q-Q plot. That suggests a pretty strong positive skew in our residuals.
+
+```{R}
+hist(model$residuals, breaks = 100)
+```
+
+To confirm this, we can plot the histogram of our residuals, and we do see a very strong positive skew in our residuals. The CLM says if our sample size is large enough, we can assume our estimators have a normal sampling distribution. The rule of thumb is that the CLM can be applied when the sample size is greater than 30. This isn't always true, however, with strong positive skews. In our case, we have a sample size of 9489 which is much larger than 30 so I guess it might be okay to assume the CLM holds.
+  
+  3. Generate a printout of your model coefficients, complete with standard errors that are valid given your diagnostics. Comment on both the practical and statistical significance of your coefficients.
+
+```{R}
+library(car)
+library(lmtest)
+library(sandwich)
+library(stargazer)
+
+vif(model)
+```
+
+From the variance inflation factors calculated above, it seems like the lenghth and rate variables do not have very strong colinearity with each other. Therefore, we do not have to worry too much about the nonperfect multicolinearity. 
+
+```{R}
+# using robust standard errors because we have heteroskedasticity
+coeftest(model, vcov = vcovHC)
+summary(videos$length)
+```
+
+We can see that both length and rate are statistically significant variables. The more significant value is the rating of the video. By increasing the rating of the video by 1, it will result in 2105 more views. By increasing the length of the video by 1 second (the average is 226.7 which seems to be too high to be minutes for videos on Youtube) gains 3 more views.
+
+```{R}
+stargazer(model, type = "text", omit.stat = "f",
+          se = sqrt(diag(vcovHC(model))),
+          star.cutoffs = c(0.05, 0.01, 0.001))
+```
+
+For a better view of the coefficients, a stargazer table is presented above.

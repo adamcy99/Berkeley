@@ -1,0 +1,593 @@
+---
+title: 'Live Session - Week 2: Discrete Response Models Lecture 2'
+author: "Jeffrey Yau"
+date: "2019 Spring"
+output:
+  pdf_document: default
+---
+
+# Agenda
+
+1. Quiz 1 (start promptly 5 minutes after class begins)
+
+2. Review Homework 1
+
+3. An overview of this lecture and a discussion of binary regression models
+
+4. An extended example: To work or not?
+
+5. Q&A
+
+# An Overivew of the Lecture (estimated time: 10 minutes)
+
+**Required Readings:**
+  BL2015: Ch. 2.1, 2.2.1 - 2.2.4
+
+This lecture begins the study of logistic regression models, the most important special case of the generalized linear models (GLMs). It begins with a discussion of why classical linear regression models is not appropriate, from both statistical sense and practical application sense, to model categorical respone variable.
+
+Topics covered in this lecture include
+
+  * An introduction to binary response models and linear probability model (its advantages, and its limitations), covering the formulation of forme and its advantages limitations of the latter
+  * Binomial logistic regression model
+  * The logit transformation and the logistic curve
+  * Statistical assumption of binomial logistic regression model
+  * Maximum likelihood estimation of the parameters and an overview of a numerical procedure used in practice
+  * Variance-Covariance matrix of the estimators
+  * Hypothesis tests for the binomial logistic regression model parameters
+  * The notion of deviance and odds ratios in the context of logistic regression models
+  * Probability of success and the corresponding confidence intervals in the context of logistic regression models
+  * Common non-linear transformation used in the context of binary dependent variable
+  * Visual assessment of the logistic regression model
+
+****
+
+# Learning Objectives 
+
+In this lecture, students will learn
+  * The mathematical formulation of Binary Response Models, Linear Probability Model, its advantages, and its limitations
+  
+  * Common non-linear transformation used in the context of binary dependent variable
+  
+  * Binary Logistic Regression Model 
+  
+  * Underlying assumptions of Binary Logistic Regression Model 
+  
+  * Maximum likelihood estimation and an overview of a numerical procedure used in practice
+  
+  * Variance-Covariance matrix of the estimates
+  
+  * Hypothesis testing
+  
+  * Discusses how to estimate and make inferences about a single probability of success
+  
+  * The notion of deviance
+  
+  * Odds ratios in the context of binary logistic regression model
+  
+  * Discussion of probability of success and its associated inference
+  
+  * Visual assessment of logistic regression model
+
+\newpage
+# Regression Models of Binary Response Variable
+
+## Linear Probability Model
+Given a set of $n$ realizations from $K$ explanatory variables, $\{ x_{i1},\dots x_{iK}\}$, a regression model relates the dependent variable, $P(Y=1)=\pi$, with the set of explanatory variables via a parametric function $g()$ with the parameters $\mathbf{\beta}$:
+
+$$
+\pi_i = P(Y_i = 1 | x_{i1},\dots x_{iK}) = g(x_{i1},\dots x_{iK} | \mathbf{\beta})
+$$
+
+Different functional forms of $g()$ give different regression models.
+
+If $g()$ is an linear function, then we have a *linear probability model*, which has many drawbacks and should not be used:
+$$
+\pi_i = \beta_0 + \beta_1 x_{i1} + \dots + \beta_K x_{iK} + \epsilon_i
+$$
+
+**Breakout room discussion (8 minutes):**
+  - **What are the advantages of the linear probability model?**
+  - **What are the drawbacks of the linear probability model?**
+  - **Have you you the linear probability model in your work or in other context? If so, please describe the situation in which the linear probability model is applied.**
+
+\newpage
+## Binary Logistic Regression
+
+### Formulation
+
+$$
+\begin{aligned}
+  \pi_i &= P(Y_i = 1 | x_{i1},\dots x_{iK}) \\
+  &= g(x_{i1},\dots x_{iK} | \mathbf{\beta} \\
+  &= \frac{exp(z_i)}{1+exp(z_i)}
+\end{aligned}
+$$
+
+where
+
+$$
+z_i =  \beta_0 + \beta_1 x_{i1} + \dots + \beta_K x_{iK}
+$$
+
+
+  - the *link function* translates from the scale of mean response to the scale of linear predictor.
+  
+  $$\eta(\mathbf{x}) = \beta_0 + \beta_1 x_1 + \dots + \beta_k x_k$$
+  
+  With $\mu(\mathbf{x}) = E(y | \mathbf{x})$ being the conditional mean of the response, we have in GLM 
+  
+  $$g(\mu(\mathbf{x})) = \eta(\mu(\mathbf{x}))$$
+  
+Another way to express a logistic regression is
+
+$$
+logit \left( \pi_i \right)  = log \left( \frac{\pi_i}{1 - \pi_i} \right) = \beta_0 + \beta_1 x_{i1} + \dots + \beta_K x_{iK}
+$$
+
+\newpage
+# An Extended Example
+
+Insert the function to *tidy up* the code when they are printed out
+```{r}
+library(knitr)
+opts_chunk$set(tidy.opts=list(width.cutoff=60),tidy=TRUE)
+```
+
+## Practical Tips for Implementing Binary Logistic Regression 
+
+When solving data science problems, always begin with the understanding of the underlying (business, policy, scientific, etc) question; our first step is typically **NOT** to jump right into the data.
+
+For this example, suppose the question is *"Do females who have higher family income (excluding wife's income) have lower labor force participation rate?" If so, what is the magnitude of the effect?* Note that this was not objective in *Mroz (1987)'s* paper. For the sake of learning to use logistic regression in answering a specific question, we stick with this question in this example.
+
+Understanding the sample data: Remember that this sample comes from *1976 Panel Data of Income Dynamics (PSID)*. PSID is one of the most popular datasets used by labor economists.
+
+First, load the car library in order to use the Mroz dataset and understand the structure dataset.
+
+Typical questions you should always ask when examining a dataset include
+
+  - What are the number of variables (or "features" as they are typically called in data science in general and machine learning in specific) and number of observations (or "examlpes" in data science)?
+  - Are these variables sufficient for you to answer you questions?
+  - If not, what other variables would you like to have? What impact (qualitatively) might not having these variables have on your models?
+  - What are the number of observations?
+  - Are there any missing values (in each of the variables)?
+  - Are there any abnormal values in each of the variables in the raw data?
+
+*Note: in practice, you will likely query your data from different tables potentially from different databases, clearn them, process them, join them, and perhaps process them even further. This is before any feature engineering step. However, we will not do any of these in this course.*
+
+```{r}
+# Import libraries
+library(car)
+library(dplyr)
+library(Hmisc)
+
+# Set working directory
+setwd("~/Documents/Teach/Cal/w271/course-main-dev/live-session-files/week02")
+wd <- getwd()
+wd
+
+?Mroz
+data(Mroz)
+str(Mroz)
+
+# Various ways to summarize the data, which with its pros and cons
+summary(Mroz)
+glimpse(Mroz) # glimpse can be use for any data.frame or table in R
+#View(Mroz)
+describe(Mroz)
+
+
+head(Mroz, 5)
+some(Mroz, 5)
+tail(Mroz, 5)
+```
+
+## Descriptive statistical analysis of the data
+
+**Breakout room discussion (10 minutes):**
+**Task: Discuss the basic descriptive data analysis below; feel free to add more analyses as you see fit.**
+
+An initiation of the exploratory data analysis (EDA):
+
+  - *Note that this descriptive statistics analysis I included here is far from completed, and you can use it as a practice to complete it. Feel free to work with your classmates.*
+
+1. No variable in the data set has missnig value. (This is very unlikely in practice, but this is a clean dataset highly curated for used in this example.)
+
+2. The response (or dependent) variable of interest, female labor force participation denoted as *lfp*, is a binary variable taking the type "factor".  The sample proporation of participation is 57% (or 428 people in the sample).
+
+3. There are 7 potential explanatory variables included in this data:
+  - number of kids below the age of 5
+  - number of kids between 6 and 18
+  - wife's age (in years)
+  - wife's college attendance
+  - husband's college attendance
+  - log of wife's estimated wage rate
+  - family income excluding the wife's wage ($1000)
+
+All of them are potential determinants of wife's labor force participation, although I am concern using the wage rate (until I can learn more about this variable) because only those who worked have a wage rate.  Also, we should not think of this list as exhaustive. Because our focus on this example is logitic regression modeling, let's for the time being, pretend that this list is sufficient (that is, I completely assume away the issue of omitted variable bias.)
+
+4. Summary of the discussion of univariate, bivariate, and multivarite analyses should come here. Note that most of these variables are categorical, making scatterplot matrix not an effective graphic device to visualize many bivariate relationships in one graph. In this course, I pay a lot of attention to how students conduct EDA, much more so than you would in w203. (*I will tell you why it matters in practice.*)
+
+In general, we will examine / discuss 
+    - the shape of the distribution, skewness, fat tail, multimodal, any lumpiness, etc
+    - all of these distributional features across different groups of interest, such as number of kids in different age groups, husband's and wife's college attendance status
+    - proportion of different categories
+    - distribution in cross-tabulation (this is where contingency tables will come in handy)
+  - Think about engineering features (i.e. transformation of raw variables and/or creating new variables). Keep in mind that *log()* transformation is one of the many different forms of transformation. Note also that I use the terms *variables* and *features* interchangably. This lecture is a good place for you to review *w203*. For this specific dataset in this specific example, you may need to think about whether 
+    - to create a variable to describe the total number of kids?
+    - to bin some of the variables? (Are some of the observations in some of the cell in the frequency or contingency tables too small?)
+    - to creat spline function of some of the variables?
+    - to transform one or more of the existing raw variables?
+    - to create polynomial for one or more of the existing raw variables to capture non-linear effect?
+    - to interact some of the variables?
+    - to create sum or difference of variables?
+    - etc
+
+*Note that for some of the graphs below, such as the overlapping density functions, I plotted them to show you their effectiveness, or lack thereof, in displaying the underlying relationship.*
+
+**Note that unlike the async lectures, which I didn't use any specific libraries to conduct data visualization, I use *ggplot()* quite extensively in all of the live sessions.**
+
+```{r}
+library(dplyr)
+library(ggplot2)
+
+describe(exp(Mroz$lwg))
+min(exp(Mroz$lwg))
+
+# Distribution of log(wage)
+ggplot(Mroz, aes(x = lwg)) +
+  geom_histogram(aes(y = ..density..), binwidth = 0.2, fill="#0072B2", colour="black") +
+  ggtitle("Log Wages") + 
+  theme(plot.title = element_text(lineheight=1, face="bold"))
+
+# log(wage) by lfp
+ggplot(Mroz, aes(factor(lfp), lwg)) +
+  geom_boxplot(aes(fill = factor(lfp))) + 
+  geom_jitter() +
+  ggtitle("Log(wage) by Labor Force Participation") + 
+  theme(plot.title = element_text(lineheight=1, face="bold")) 
+
+# age by lfp
+ggplot(Mroz, aes(factor(lfp), age)) +
+  geom_boxplot(aes(fill = factor(lfp))) + 
+  geom_jitter() +
+  ggtitle("Age by Labor Force Participation") + 
+  theme(plot.title = element_text(lineheight=1, face="bold")) 
+
+# Distribution of age
+summary(Mroz$age)
+ggplot(Mroz, aes(x = age)) +
+  geom_histogram(aes(y = ..density..), binwidth = 0.2, fill="#0072B2", colour="black") +
+  ggtitle("age") + 
+  theme(plot.title = element_text(lineheight=1, face="bold"))
+
+# Distribution of age by wc
+# Were those who attended colleage tend to be younger?
+ggplot(Mroz, aes(factor(wc), age)) +
+  geom_boxplot(aes(fill = factor(wc))) + 
+  geom_jitter() +
+  ggtitle("Age by Wife's College Attendance Status") + 
+  theme(plot.title = element_text(lineheight=1, face="bold")) 
+
+ggplot(Mroz, aes(age, fill = wc, colour = wc)) +
+  geom_density(alpha=0.2)
+
+# Distribution of age by hc
+# Were those whose husband attended colleage tend to be younger?
+ggplot(Mroz, aes(factor(hc), age)) +
+  geom_boxplot(aes(fill = factor(hc))) + 
+  geom_jitter() +
+  ggtitle("Age by Husband's College Attendance Status") + 
+  theme(plot.title = element_text(lineheight=1, face="bold")) 
+
+ggplot(Mroz, aes(age, fill = hc, colour = hc)) +
+  geom_density(alpha=0.2) +
+  ggtitle("Age by Husband's College Attendance Status") + 
+  theme(plot.title = element_text(lineheight=1, face="bold")) 
+
+# Distribution of age by number kids in different age group
+ggplot(Mroz, aes(factor(k5), age)) +  
+  geom_boxplot(aes(fill = factor(k5))) + 
+  geom_jitter() +
+  ggtitle("Age by Number of kids younger than 6") + 
+  theme(plot.title = element_text(lineheight=1, face="bold")) 
+
+ggplot(Mroz, aes(age, fill = factor(k5), colour = factor(k5))) +
+  geom_density(alpha=0.2) +
+  ggtitle("Age by Number of kids younger than 6") + 
+  theme(plot.title = element_text(lineheight=1, face="bold")) 
+
+ggplot(Mroz, aes(factor(k618), age)) +  
+  geom_boxplot(aes(fill = factor(k618))) + 
+  geom_jitter() +
+  ggtitle("Age by Number of kids between 6 and 18") + 
+  theme(plot.title = element_text(lineheight=1, face="bold")) 
+
+ggplot(Mroz, aes(age, fill = factor(k618), colour = factor(k618))) +
+  geom_density(alpha=0.2) +
+  ggtitle("Age by Number of kids  between 6 and 18") + 
+  theme(plot.title = element_text(lineheight=1, face="bold")) 
+
+# It may be easier to visualize age by first binning the variable
+table(Mroz$k5)
+table(Mroz$k618)
+table(Mroz$k5, Mroz$k618)
+xtabs(~k5 + k618, data=Mroz)
+
+table(Mroz$hc)
+round(prop.table(table(Mroz$hc)),2)
+
+table(Mroz$wc)
+round(prop.table(table(Mroz$wc)),2)
+
+xtabs(~hc+wc, data=Mroz)
+round(prop.table(xtabs(~hc+wc, data=Mroz)),2)
+```
+
+*As a best practice, we will need to incorporate insights generated from EDA on model specification. In what follows, I employ a very simple specification that uses all the variables as-is, but the focus is on how to interpret the coefficients.*
+
+## Estimate a Binary Logistic Regression
+
+Again, I have not used any EDA to inform the specification of my model, something that I take very seriously about in this course. The reason is that we will be talking about various techniques of variable transformation for binary logistic regression next week, and I want to wait till next week to incorporate "insights" from EDA for model specification.
+
+**Breakout Room Discussion (15 minutes):**
+
+  - **Ensure you understand the model estimation procedure and the model outputs**
+
+  - **Interpret everything in the summary of the model results.**
+  
+  - **Interpret both the estimated coefficients in the original model result summary as well as their exponentiated versoin. Why do we exponentiate the coefficients?**
+  
+  - **Interpret the effect (in terms of odds ratios) of decreasing k5 by 1-unit.**
+  
+  - **Interpret the effect (in terms of odds rations) of decreasing inc by $10,000.**
+  
+  - **Discuss the result of the test.**
+
+```{r}
+mroz.glm <- glm(lfp ~ k5 + k618 + age + wc + hc + lwg + inc, 
+               family = binomial, data = Mroz)
+summary(mroz.glm)
+round(exp(cbind(Estimate=coef(mroz.glm), confint(mroz.glm))),2)
+vcov(mroz.glm)
+```
+
+## Interpretation of model results
+
+**Do the "raw" coefficient estimates "directionally make sense"?**
+```{r}
+summary(mroz.glm)
+```
+
+Below, I include some codes to help you interpret the model results.  Feel free to modify the codes.
+
+Interpreting the coefficient estimates in terms of odds ratio is a common practice.  Recall that 
+$$
+OR = \frac{Odds_{x_k+c}}{Odds_{x_k}}=exp(c \beta_k)
+$$
+
+The estimated odds ratio becomes
+$$
+\widehat{OR} = \frac{Odds_{x_k+c}}{Odds_{x_k}}=exp(c \hat{\beta}_k)
+$$
+
+
+```{r}
+round(exp(cbind(coef(mroz.glm))),2)
+```
+
+
+```{r}
+#c = YOU NEED TO SPECIFY THE NUMBER HERE
+c=1
+exp(-c*coef(mroz.glm)['inc'])
+```
+**<You should interpret The odds of participating in the labor force change.>**
+
+```{r}
+#c = YOU NEED TO SPECIFY THE NUMBER HERE
+c=1
+exp(c*coef(mroz.glm)['k5'])
+```
+**<You should interpret The odds of participating in the labor force change.>**
+
+
+## Statistical Inference
+
+**Breakout Room Discussion (10 minutes):**
+
+  - **Discuss the results of the test.**
+
+Using Likelihood Ratio Test (LRT) for hypothesis testing, such as, in a logistic regression model, $logit(\pi) = \beta_0 + \beta_1 x_1 + \dots + \beta_k x_k + \dots + \beta_K x_K$, test
+
+$H_0: \beta_k = 0$
+$H_a: \beta_k \ne 0$
+
+For instance, suppose we want to test whether family income ($inc$) has an effect on the wife's labor force participation, we test
+
+$H_0: \beta_{inc} = 0$
+$H_a: \beta_{inc} \ne 0$
+
+Using LRT, implemented via the *Anova()* (or *anova()*) function.
+
+\begin{align*}
+-2log(\Lambda) &= -2log\left( \frac{L(\hat{\mathbf{\beta}}^{(0)} | y_1, \dots, y_n)}{L(\hat{\mathbf{\beta}}^{(a)} | y_1, \dots, y_n)}
+\right) \\
+&= -2\sum y_i log\left( \frac{\hat{\pi}_i^{(0)}}{\hat{\pi}_i^{(a)}} \right) + (1 - y_i ) log\left( \frac{1- \hat{\pi}_i^{(0)}}{1- \hat{\pi}_i^{(a)}} \right)
+\end{align*}
+
+
+```{r}
+# Likelihood Ratio Test
+library(car)
+Anova(mroz.glm, test="LR")
+```
+
+Note that another way to perform hypothesis testing is to use *anova()* function to estimate both models under the null hypothesis and alternative hypothesis and then use the corresponding model-fitted objects as argument within the function. This is my preferred method. As an illustration, examine the following example.
+
+```{r}
+mroz.glm.h0 <- glm(lfp ~ k5 + k618 + age + wc + hc + lwg, 
+               family = binomial, data = Mroz)
+mroz.glm.h1 <- glm(lfp ~ k5 + k618 + age + wc + hc + lwg + inc, 
+               family = binomial, data = Mroz)
+anova(mroz.glm.h0,mroz.glm.h1)
+```
+
+
+## Confidence Interval for $\beta_k$
+
+**Wald Confidence:**
+
+$$
+\hat{\beta_k} \pm Z_{1-\alpha/2} \sqrt{\widehat{Var}(\hat{\beta}_k)}
+$$
+
+$$
+exp \left( \hat{\beta_k} \pm Z_{1-\alpha/2} \sqrt{\widehat{Var}(\hat{\beta}_k)} \right)
+$$
+
+However, for reasons we discussed extensively in lecture 1, Wald confidence interval only has true confidence level close to the stated confidence level when the sample is sufficiently large.  Therefore, we use the *profile likelihood ratio (LR)* confidence interval, which, for binary logistic regression, can be calculated using a *R* function $confint()$:
+
+```{r}
+#round(exp(cbind(Estimate=coef(mroz.glm), confint(mroz.glm))),2)
+confint.default(object=mroz.glm, level=0.95)
+exp(confint.default(object=mroz.glm, level=0.95))
+```
+
+**Wald Confidence Interval**
+```{r}
+#vcov(mroz.glm)
+#summary(mroz.glm)
+mroz.glm$coefficients[8] + qnorm(p = c(0.025, 0.975))*sqrt(vcov(mroz.glm)[8,8])
+exp(mroz.glm$coefficients[8] + qnorm(p = c(0.025, 0.975))*sqrt(vcov(mroz.glm)[8,8]))
+```
+
+## Confidence Interval for the Probability of Success
+
+Recall that the estimated probability of success is
+$$
+\hat{\pi} = \frac{exp \left( \hat{\beta}_0 + \hat{\beta}_1 x_1 + \dots + \hat{\beta}_K x_k \right)}{1+exp \left(\hat{\beta}_0 + \hat{\beta}_1 x_1 + \dots + \hat{\beta}_K x_k \right)}
+$$
+
+While backing out the estimated probability of success is straight-forward, obtaining its confidence interval is not, as it involves many parameters.
+
+**Wald Confidence Interval**
+$$
+\hat{\beta}_0 + \hat{\beta}_1 x_1 + \dots + \hat{\beta}_K x_K \pm Z_{1-\alpha/2} \sqrt{\widehat{Var}(\hat{\beta}_0 + \hat{\beta}_1 x_1 + \dots + \hat{\beta}_K x_K)} 
+$$
+where 
+$$
+\widehat{Var}(\hat{\beta}_0 + \hat{\beta}_1 x_1 + \dots + \hat{\beta}_K x_K) = \sum_{i=0}^K x_i^2 \widehat{Var}(\hat{\beta_i}) + 2 \sum_{i=0}^{K-1} \sum_{j=i+1}^{K} x_i x_j \widehat{Cov}(\hat{\beta}_i,\hat{\beta}_j)
+$$
+
+So, the Wald Interval for $\pi$ 
+
+$$
+\frac{exp \left( \hat{\beta}_0 + \hat{\beta}_1 x_1 + \dots + \hat{\beta}_K x_k \pm \sqrt{\sum_{i=0}^K x_i^2 \widehat{Var}(\hat{\beta_i}) + 2 \sum_{i=0}^{K-1} \sum_{j=i+1}^{K} x_i x_j \widehat{Cov}(\hat{\beta}_i,\hat{\beta}_j)}  \right)}{1+exp \left(\hat{\beta}_0 + \hat{\beta}_1 x_1 + \dots + \hat{\beta}_K x_k \right)  \pm \sqrt{\sum_{i=0}^K x_i^2 \widehat{Var}(\hat{\beta_i}) + 2 \sum_{i=0}^{K-1} \sum_{j=i+1}^{K} x_i x_j \widehat{Cov}(\hat{\beta}_i,\hat{\beta}_j)}}
+$$
+
+```{r}
+alpha = 0.5
+
+wc = "yes"
+hc = "yes"
+predict.data <- data.frame(k5 = mean(Mroz$k5),
+                           k618 = mean(Mroz$k618),
+                           age = mean(Mroz$age),
+                           wc = factor(wc), 
+                           hc = factor(hc),
+                           lwg = mean(Mroz$lwg),
+                           inc = mean(Mroz$inc))
+str(predict.data)
+
+# Obtain the linear predictor
+linear.pred = predict(object = mroz.glm, newdata = predict.data,
+                      type = "link", se = TRUE)
+linear.pred
+
+# Then, compute pi.hat
+pi.hat = exp(linear.pred$fit)/(1+exp(linear.pred$fit))
+pi.hat
+
+# Compute Wald Confidence Interval (in 2 steps)
+# Step 1
+CI.lin.pred = linear.pred$fit + qnorm(p = c(alpha/2, 1-alpha/2))*linear.pred$se
+CI.lin.pred
+
+# Step 2
+CI.pi = exp(CI.lin.pred)/(1+exp(CI.lin.pred))
+CI.pi
+
+# Store all the components in a data frame
+str(predict.data)
+round(data.frame(pi.hat, lower=CI.pi[1], upper=CI.pi[1]),4)
+```
+
+## Visualize the effect of family income on Female LFP
+
+```{r}
+round(exp(cbind(Estimate=coef(mroz.glm), confint(mroz.glm))),2)
+
+summary(Mroz)
+mroz.glm$coefficients
+str(mroz.glm$coefficients)
+coef <- mroz.glm$coefficients
+coef[1]
+min(Mroz$inc)
+
+mroz.lm <- lm(as.numeric(lfp) ~ k5 + k618 + age + wc + hc + lwg + inc, data = Mroz)
+summary(mroz.lm)
+
+# Effect of income on LFP for a family with no kid, wife was 40 years old, both wife and husband attended college, and wife's estimated wage rate was 1.07
+
+rm(x)
+xx = c(1, 0, 0, 40, 1, 1, 1.07)
+length(coef)
+length(xx)
+z = coef[1]*xx[1] + coef[2]*xx[2] + coef[3]*xx[3] + coef[3]*xx[3] + coef[4]*xx[4] + coef[5]*xx[5] + coef[6]*xx[6] + coef[7]*xx[7]
+z
+x <- Mroz$inc
+coef[8]
+curve(expr = exp(z + coef[8]*x)/(1+exp(z + coef[8]*x)), 
+    xlim = c(min(Mroz$inc), max(Mroz$inc)), 
+    ylim = c(0,1),
+    col = "blue", 
+    main = expression(pi == frac(e^{z + coef[inc]*inc}, 1+e^{z+coef[inc]*inc})), 
+    xlab =  expression(inc), ylab = expression(pi))
+
+# Reproduce the graph overlaying the same result from the linear model as a comparison
+curve(expr = exp(z + coef[8]*x)/(1+exp(z + coef[8]*x)), 
+    xlim = c(min(Mroz$inc), max(Mroz$inc)), 
+    ylim = c(0,2),
+    col = "blue", 
+    main = expression(pi == frac(e^{z + coef[inc]*inc}, 1+e^{z+coef[inc]*inc})), 
+    xlab =  expression(inc), ylab = expression(pi))
+
+par(new=TRUE)
+
+y2 <- mroz.lm$coefficients[8]*x
+lm.coef <- mroz.lm$coefficients
+lm.z <- lm.coef[1]*xx[1] + lm.coef[2]*xx[2] + lm.coef[3]*xx[3] + lm.coef[3]*xx[3] + lm.coef[4]*xx[4] + lm.coef[5]*xx[5] + lm.coef[6]*xx[6] + lm.coef[7]*xx[7]
+
+lines(x, lm.z + mroz.lm$coefficients[8]*x,col="green")
+
+```
+
+
+## Linear Probability Model
+
+**Take-home exercises; no need to turn in, but you are encouraged to do them.**
+
+  1. Estimate a linear probability model using the same specification as in our binary logistic regression model estimated above.
+  
+  2. Interpret the model results.
+  
+  3. Conduct model diagnostics.
+
+  4. Test the CLM model assumptions.
+
+
+
+
+
+
+

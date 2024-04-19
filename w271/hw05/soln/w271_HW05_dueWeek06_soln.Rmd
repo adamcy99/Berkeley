@@ -1,0 +1,131 @@
+---
+title : 'w271: Homework 5 (Due: Week 6) Suggested Solutions'
+author: "Professor Jeffrey Yau"
+output: 
+  pdf_document:
+  toc: true
+  number_sections: true
+fontsize: 11pt
+geometry: margin=1in
+---
+
+# Due: Before the Live Session of Week 6
+
+# Instructions (Please Read it Carefully!):
+
+*  $\textbf{Page limit of the pdf report: None, but please be reasonable}$
+* Page setup: 
+  * Use the following font size, margin, and linespace:
+    * fontsize=11pt
+    * margin=1in
+    * line_spacing=single
+
+* Submission:
+    * Homework needs to be completed individually; this is not a group project. 
+    * Each student submits his/her homework to the course github repo by the deadline; submission and revision made after the deadline will not be graded
+    * Submit 2 files:
+        1. A pdf file that details your answers. Include all the R codes used to produce the answers. *Please do not suppress the codes in your pdf file.*
+        2. R markdown file used to produce the pdf file
+    * Use the following file-naming convensation; fail to do so will receive $10\%$ reduction in the grade:
+        * StudentFirstNameLastName_HWNumber.fileExtension
+        * For example, if the student's name is Kyle Cartman for homework 1, name your files as
+            * KyleCartman_HW1.Rmd
+            * KyleCartman_HW1.pdf
+    * Although it sounds obvious, please write your name on page 1 of your pdf and Rmd files.
+
+    * For statistical methods that we cover in this course, use only the R libraries and functions that are covered in this course. If you use libraries and functions for statistical modeling that we have not covered, you have to  (1) provide an explanation of why such libraries and functions are used instead and (2) reference to the library documentation. **Lacking the explanation and reference to the documentation will result in a score of zero for the corresponding question.** For data wrangling and data visualization, you are free to use other libraries, such as dplyr, ggplot2, etc.
+
+  * For mathematical formulae, type them in your R markdown file. **Do not write them on a piece of paper, snap a photo, and either insert the image file or sumbit the image file separately. Doing so will receive a $0$ for that whole question.**
+
+  *  Students are expected to act with regards to UC Berkeley Academic Integrity.
+
+
+\newpage
+
+```{r}
+rm(list = ls())
+library(astsa)
+
+plot(cmort, xlab= "Time in Weeks", ylab="Mortality. Units Unknown")
+title(main="Weekly cardiovascular mortality: 1970-1979") 
+```
+
+**1. Conduct the EDA of the `weekly cardiovascular mortality` time series.**
+
+The `weekly cardiovascular mortality` is stored in a time series object. It is a weekly series with 508 observations starting in the first week of 1970 and end in 1979.
+
+```{r, warning=FALSE, message=FALSE}
+rm(list = ls())
+
+library(knitr)
+opts_chunk$set(tidy.opts=list(width.cutoff=60),tidy=TRUE)
+
+# Set working directory
+wd <- "~/Documents/Teach/Cal/w271/course-main-dev/hw/hw05/soln"
+setwd(wd)
+
+# Load libraries
+library(astsa)
+library(ggplot2)
+library(skimr)
+
+# Basic structure of the dataset
+str(cmort)
+skim(cmort)
+
+head(cbind(time(cmort),cmort))
+tail(cbind(time(cmort),cmort))
+
+# Time Series Plot of the Mortality Series
+plot.ts(cmort, xlab= "Time in Weeks", ylab="Mortality. Units Unknown")
+title(main="Weekly cardiovascular mortality: 1970-1979") 
+hist(cmort,main="Weekly cardiovascular mortality: 1970-1979", col="blue",
+     xlab="Mortality")
+
+# Boxplot of of the Mortality Series for Detecting Seasonality
+boxplot(cmort ~ cycle(cmort))
+title(main="Weekly cardiovascular mortality") 
+
+# Moving Average of the Mortality Series for Detecting Trend
+mv=filter(cmort, sides=1, rep(1/52,52))
+plot.ts(mv)
+title(main="Weekly cardiovascular mortality: 52-week Moving Average") 
+
+plot(cmort)
+lines(mv)
+title(main="Weekly cardiovascular mortality: 52-week Moving Average") 
+```
+
+**2. What features do you notice of the `weekly cardiovascular mortality` time-series plot?**
+
+Based only on the time series plot, the weekly cardiovascular mortality series appears to display seasonality and a downward trend. Though not asked in this question, the seasonality and trends can be detected in the boxplot and 52-week moving average.
+
+**3. Do you think that it is stationary in the mean? In the variance?**
+
+The weekly cardiovascular mortality series does not appears to have stationary in mean due to its trend, but it is quite difficult to detect whether there exists non-stationary in variance, though the fluctuations in 1973 seems to be bigger than other years and the fluctuations in 1977 seems to be smaller than other years.
+
+**4. What pieces of information did you use from your EDA to arrive at your conclusion?**
+
+The time series plots of the original series and the 52-week moving average series were used to arrive at the conclusion in question 3.
+
+**5. Do you find any evidence that there is a dependency structure in this time series data? Please explain.**
+
+As mentioned above, the series appears to have trend and seasonality. The series also fluctuates in a similar pattern year after year.  All of these are pieces of dependency evidence, which are exhibited in the time series plot of the raw series and the 52-week moving average series and the boxplot.
+
+
+**6. What is the difference between strict and weak stationarity?**
+
+Strick stationarity concerns the stataionarity on the entire distribution while weak stationarity concerns only the first two moments of a distribution. 
+
+A stochastic process is strictly stationary if its distribution is unchanged with respect to any an arbitrary time shift. A stochastic process is weakly stationary if its first two moments remain constant  with respect to any an arbitrary time shift
+
+
+**7. What is the difference between an acf and pacf plot?**
+
+The `ACF` plot is the graph of autocorrelation function, and the `PACF` plot is the graph of partial autocorrelation function.
+
+**8. (Open-ended question)  Give two examples of questions people in your industry might ask that, based on what you learn in the async lecture, you think can be addressed using time-series analysis.**
+
+We have discussed this in live session 6.
+
+

@@ -1,0 +1,5 @@
+B	labs	100	
+B	quux	9	
+C	foo	5	
+C	bar	5	
+A	qi	1	

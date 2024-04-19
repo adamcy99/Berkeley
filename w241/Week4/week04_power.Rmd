@@ -1,0 +1,208 @@
+---
+title: "Simulating Power"
+author: D. Alex Hughes, Daniel Hedblom, Micah Gell-Redman
+date: \today
+---
+
+# Power as a Concept 
+
+A *very* important consideration before beginning an experiment is making a probabilistic determination about "how likely would my test be to detect an effect, *if there really was an effect*." This statement is an intuitive phrasing of the concept of a test's power. 
+
+Consider why this is important. Suppose that you are in charge of managing the new check-out flow for your company's online sales; the old system requires authentication, passing credit card information, entering shipping information, etc. The new system is modeled after Amazon's "Buy Now with One Click". The outcome that you're interested in -- unsurprisingly -- is the rate of purchase between the two different check-out flows. 
+
+Suppose that the state of the world is such that the new check-out flow **does** increase sales, *a lot* -- but we haven't run the experiment yet so we can't demonstrate this. What then is the goal of the experiment? The goal would be to reliably demonstrate, in a way that would convince the skeptic (or Feynman) that the new check-out flow caused the increase. 
+
+Would a trial with only two individuals, one in treatment and one in control, observed for one day produce the evidence that would convince the skeptic? I quite doubt it -- there just isn't enough data gathered. It might be the case that today neither people buy anything; or that they both buy something, or... any of another strange, or stochastic events could happen. 
+
+Would a trial with millions and millions and millions of users, equally split between treatment and control produce the evidence that would convince the skeptic? Probably, provided you've run your experiment correctly. But, most of the time we don't have unlimited data to use; neither do we have no data to use (we're not data-theorists after all). A statement of power is a statement that helps us to adjudicate where we fall between these two extremes. 
+
+# Ingredients to Power 
+
+As we have talked about, we power has several ingredients. 
+
+- Treatment effect size
+- Sample size (overall); and sample size in condition
+- Underlying Variance of Outcomes 
+- $\alpha$ level of significance 
+
+While there are analytic solutions for power calculations (see e.g. page 93 in *Field Experiments*), it is our opinion that these analytic solutions paper over the critical assumptions that are going into the statements that you're making. Instead, we prefer a simulation based approach to calculating power that requires that you state each and every of the data-assumptions that you're going to make -- as well as the estimation procedure that you're going to employ at the analysis phase. 
+
+## Calculating Individual-Level Power 
+
+Suppose that you're working with individual-level, checkout data. Then, to perform a simulation based power analysis, you need to make the following statements: 
+
+- **What is the outcome under control condition?** This is a statement that can be informed by the data that you have on the rack; prior data that you can observe, summarizations of data from other industries or research, or if none of this exists, from your own best guess. When making statement, you need also to consider what the dispersion under the control condition is, or will be. 
+- **What is likely to be the treamtent effect?** When you supply people with treatment, what effect will it have? Will it be a uniform effect that everybody increases by $k$ points? Or, will it be a distribution of an effect? Will the treatment effects be meaningful different at different points in the control distribution (HTE?) or will the average effect be the same in all places. 
+- **How many units can you utilize?** How many individual units will you have access to for the control condition? How many individual units will you have access to for the treatment condition or conditions? 
+- **What is the test that you're going to apply at the estimation stage?** How are you going to test your experiment? Using RI? Using a `ks.test`? Using a regression? With a Bayesian statement? How strong must the evidence be for you to conclude that your experiment was successful? 
+
+With these thoughts in mind, you can then set out to create data that conforms to the assumptions that you've written done. Below is such an example of this. 
+
+## Example of Power 
+
+In the case that we're working with, suppose that under the control distribution, on a typical day a user will make a purchase in 10% of the items that he or she browses. Because we have past data that has been reported in other studies, we think that the treatment effect will range from 2% at the absolute smallest, to as large as 8% at the absolute largest. We actually don't know how many units we have access to -- this is the parameter that we want to tune so that we use as few units as possible to power out test such that in 90% of the tests we run, we would detect an effect if there actually was an effect. And, we're going to keep the testing simple -- we're just using a `t.test` for difference in mean purchases. 
+
+```{r, include=FALSE} 
+library(dplyr) 
+library(magrittr)
+library(plotly)
+``` 
+
+```{r define_test}
+individual_power <- function(
+  units, effect_size_low, effect_size_high) {
+  ## The units are the number of units that we have access to
+  ## The effect_size_low defines the smallest our treatment effect 
+  ##   can be and the effect_size_high the largest it can be. 
+  ## 
+  ## We're not defining multiple treatment possibilities, 
+  ## or rates of treatment. So, we're going to keep this fixed at 
+  ## two conditions, and a 50-50 treatment control split. 
+  
+  urn <- c('treat', 'control')
+  
+  control_dist <- rbinom(n = 10000, size = 1, prob = .1)
+  treat_size   <- runif( n = 1, min = effect_size_low, max = effect_size_high)
+  treat_dist   <- rbinom(n = 10000, size = 1, prob = .1 + treat_size)
+  
+  d <- data.frame(id = 1:units)
+  d <- d %>%  
+    mutate(
+      condition = sample(urn, size = n(), replace = TRUE),
+      outcome = ifelse(
+        condition == 'control', 
+        sample(control_dist, size = n(), replace = TRUE), 
+        sample(treat_dist,   size = n(), replace = TRUE)
+        )
+    ) 
+
+  res <- data.frame(
+  'pvalue' = t.test(outcome ~ condition, data = d)$p.value,
+  'tau' = treat_size, 
+  'baseline_mean' = d %>% filter(condition=='control') %>%  summarise(mean(outcome)), 
+  'baseline_n'    = d %>% filter(condition=='control') %>% summarise(n()),
+  'alt_mean'      = d %>% filter(condition=='treat') %>%  summarise(mean(outcome)),
+  'alt_n'         = d %>% filter(condition=='treat') %>% summarise(n()),
+  'df_n'          = d %>% summarise(n())
+  )
+
+  return(res)
+  }
+```
+With this function defined, we can imagine running a single iteration of this "experiment" by calling the function once. 
+
+```{r run-power-once} 
+small_sample = 100
+large_sample = 1000
+very_large_sample = 10000
+
+power <- individual_power(
+  units=small_sample, 
+  effect_size_low = 0.02, 
+  effect_size_high = 0.08
+  )
+```
+
+And, in this run, we can see that the single run generated a p-value of `r power$pvalue`, which was caused by a baseline average of `r power$baseline_mean` and a treatment average of `r power$alt_mean`. 
+
+Just as we've done before, we could run this a large number of times -- much like when running Randomization Inference -- to simulate a number of experiments. 
+
+```{r run-power-simulation-small} 
+power <- replicate(10, individual_power(
+  units=small_sample, 
+  effect_size_low=0.02, 
+  effect_size_high=0.08
+  ), 
+  simplify = FALSE
+)
+power <- bind_rows(power)
+``` 
+
+Finally, we can make a statement about the proportion of our tests that met our criteria for demonstrating to the skeptic that our treatment caused a difference in outcomes. 
+
+```{r conclude} 
+power %>% 
+  summarise(mean(pvalue))
+``` 
+In this case, it seems that with a sample size of `r small_sample` we achieved a power that was only `r mean(power$pvalue < 0.05) * 100`. This is probably not enough power that I would run this experiment as is. Either I would: 
+
+- Advocate for more sample;
+- Advocate for a stronger treatment or a more precise statement of the treatment distribution; or, 
+- Advocate for a more precise measurement strategy on outcomes. 
+
+Let's see what happens with more sample. 
+
+```{r run-power-simulation-large}
+power <- replicate(1000, individual_power( 
+  units=large_sample, 
+  effect_size_low=0.02, 
+  effect_size_high=0.08), 
+  simplify = FALSE
+)
+
+power <- bind_rows(power) 
+power %>% 
+  summarise(power = mean(pvalue))
+```
+This is getting better. Now we've achieved a power of `r mean(power$pvalue < 0.05) * 100`. But, I'd still like to get to 90 of the way there. Let's increase that sample some more. 
+
+```{r run-power-simulation-very-large}
+power <- replicate(1000, individual_power( 
+  units=very_large_sample, 
+  effect_size_low=0.02, 
+  effect_size_high=0.08), 
+  simplify = FALSE
+)
+
+power <- bind_rows(power) 
+power %>%  
+  summarise(power = mean(pvalue))
+```
+
+Now we're there. If there is an effect, in `r mean(power$pvalue < 0.05) * 100` of 100 trials, my tests will implicate it. 
+
+Because we also mapped back out the magnitude of the treatment effect, we could probably look at how our power moves with the magnitude of the treatment effect. 
+
+```{r}
+plot(x = power$tau, 
+     y = power$pvalue, 
+     pch = 19, col = "steelblue", 
+     main = "Pvalues and Treatment Size")
+```
+
+# Last Things Last
+
+Can we think about moving the treatment size *and* the number of units at the same time in this simulation? 
+
+```{r} 
+moving_units <- seq(from=20, to = 1000, by = 10)
+
+power <- replicate(1000, individual_power(
+  units = sample(moving_units, size = 1), 
+  effect_size_low=0.02, 
+  effect_size_high=0.16), 
+  simplify = FALSE
+)
+power <- bind_rows(power)
+names(power) <- c('pvalue' ,'tau', 
+                  'baseline_mean', 'baseline_n', 
+                  'alternate_mean', 'alternate_n', 
+                  'df_n')
+```
+
+
+```{r plot-that} 
+p <- plot_ly(power, x = ~df_n, y = ~tau, z = ~pvalue, 
+             marker = list(
+               color = ~pvalue, 
+               colorscale = 'Viridis', 
+               reversescale=T, 
+               showscale = TRUE)) %>%
+  add_markers(opacity = .5) %>% 
+  layout(scene = list(
+    xaxis = list(title = "Units"), 
+    yaxis = list(title = "Treatment Effect"), 
+    zaxiz = list(title = "Pvalue")
+  ))
+p
+``` 

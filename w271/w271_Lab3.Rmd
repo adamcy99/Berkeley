@@ -1,0 +1,387 @@
+---
+title: 'Statistical Methods for Discrete Response, Time Series, and Panel Data (W271):
+  Lab 3'
+author: "Professor Jeffrey Yau"
+geometry: margin=1in
+output:
+  pdf_document:
+    latex_engine: xelatex
+  number_sections: yes
+  html_document: default
+  toc: yes
+fontsize: 11pt
+---
+
+# Instructions:
+
+*  $\textbf{Due Date: Monday of Week 11 4p.m. Pacific Time}$
+*  $\textbf{Page limit of the pdf report for Question 1: 12 (not include title and the table of content page. No page limit for Question 2.}$
+  * Use the margin, linespace, and font size specification below:
+    * fontsize=11pt
+    * margin=1in
+    * line_spacing=single
+
+* Submission:
+    * Each group makes one submission to Github; please have one of your team members made the submission
+    * Submit 2 files:
+        1. A pdf file including the details of your analysis and all the R codes used to produce the analysis. Please do not suppress the codes in your pdf file.
+        2. R markdown file used to produce the pdf file
+    * Use the following file-naming convensation; fail to do so will receive 10% reduction in the grade:
+        * FirstNameLastName1_FirstNameLastName2_FirstNameLastName3_LabNumber.fileExtension
+        * For example, if you have three students in the group for Lab Z, and their names are Gerard Kelley, Steve Yang, and Jeffrey Yau, then you should name your file the following
+            * GerardKelley_SteveYang_JeffreyYau_LabZ.Rmd
+            * GerardKelley_SteveYang_JeffreyYau_LabZ.pdf
+    * Although it sounds obvious, please write the name of each members of your group on page 1 of your pdf and Rmd files.
+    * This lab can be completed in a group of up to 3 students in your session. Students are encouraged to work in a group for the lab.
+
+* Other general guidelines:
+    * For statistical methods that we cover in this course, use only the R libraries and functions that are covered in this course. If you use libraries and functions for statistical modeling that we have not covered, you have to provide (1) explanation of why such libraries and functions are used instead and (2) reference to the library documentation. Lacking the explanation and reference to the documentation will result in a score of zero for the corresponding question.
+
+  * Students are expected to act with regards to UC Berkeley Academic Integrity.
+
+
+# Question 1: Forecasting using a Seasonl ARIMA model
+
+*ECOMPCTNSA.csv*, contains quarterly data of E-Commerce Retail Sales as a Percent of Total Sales. The data can be found at: https://fred.stlouisfed.org/series/ECOMPCTNSA.
+
+Build a Seasonal ARIMA model and generate quarterly forecast for 2017. Make sure you use all the steps of building a univariate time series model between lecture 6 and 9, such as checking the raw data, conducting a thorough EDA, justifying all modeling decisions (including transformation), testing model assumptions, and clearly articulating why you chose your given model. Measure and discuss your model's performance. Use both in-sample and out-of-sample model performance. When estimating your model, exclude the series from 2015 and 2016. For the out-of-sample forecast, measure your model's performance in forecasting the quarterly E-Commerce retail sales in 2015 and 2016. Discuss the model performance. Also forecast beyond the observed time-period of the series. Specifically, generate quarterly forecast for 2017.
+
+
+# Question 2: Learning how to use the xts library
+
+## Materials covered in Question 2 of this lab
+
+  - Primarily the references listed in this document:
+
+      - "xts: Extensible Time Series" by Jeffrey A. Ryan and Joshua M. Ulrich. 2008. (xts.pdf)
+      - "xts FAQ" by xts Development Team. 2013 (xts_faq.pdf)
+      - xts_cheatsheet.pdf
+
+# Task 1:
+
+  1. Read 
+    A. The **Introduction** section (Section 1), which only has 1 page of reading of xts: Extensible Time Series" by Jeffrey A. Ryan and Joshua M. Ulrich
+    B. The first three questions in"xts FAQ"
+        a. What is xts?
+        b. Why should I use xts rather than zoo or another time-series package?
+        c. HowdoIinstallxts?
+    C. The "A quick introduction to xts and zoo objects" section in this document
+        
+  2. Read the "A quick introduction to xts and zoo objects" of this document
+
+# A quick introduction to xts and zoo objects
+
+### xts
+```xts```
+  - stands for eXtensible Time Series
+  - is an extended zoo object
+  - is essentially matrix + (time-based) index (aka, observation + time)
+
+  - xts is a constructor or a subclass that inherits behavior from parent (zoo); in fact, it extends the popular zoo class. As such. most zoo methods work for xts
+  - is a matrix objects; subsets always preserve the matrix form
+  - importantly, xts are indexed by a formal time object. Therefore, the data is time-stamped
+  - The two most important arguments are ```x``` for the data and ```order.by``` for the index. ```x``` must be a vector or matrix. ```order.by``` is a vector of the same length or number of rows of ```x```; it must be a proper time or date object and be in an increasing order
+
+# Task 2:
+
+  1. Read 
+    A. Section 3.1 of "xts: Extensible Time Series" by Jeffrey A. Ryan and Joshua M. Ulrich
+    
+    B. The following questions in "xts FAQ"
+        a. How do I create an xts index with millisecond precision?
+        b. OK, so now I have my millisecond series but I still can’t see the milliseconds displayed. What went wrong?
+
+  2. Follow the following section of this document
+
+
+# Creating an xts object and converting to an xts object from an imported dataset
+
+We will create an `xts` object from a matrix and a time index. First, let's create a matrix and a time index.  The matrix, as it creates, is not associated with the time indext yet.
+
+```{r setup, include=FALSE}
+rm(list = ls())
+library(knitr)
+opts_chunk$set(tidy.opts=list(width.cutoff=60),tidy=TRUE)
+```
+
+
+```{r}
+# Set working directory
+wd <-"~/Documents/Teach/Cal/w271/_2018.03_Fall/labs/lab3"
+setwd(wd)
+```
+
+```{r}
+# Create a matrix
+x <- matrix(rnorm(200), ncol=2, nrow=100)
+colnames(x) <- c("Series01", "Series02")
+str(x)
+head(x,10)
+
+idx <- seq(as.Date("2015/1/1"), by = "day", length.out = 100)
+str(idx)
+head(idx)
+tail(idx)
+```
+
+In a nutshell, `xts` is a matrix indexed by a time object. To create an xts object, we "bind" the object with the index.  Since we have already created a matrix and a time index (of the same length as the number of rows of the matrix), we are ready to "bind" them together. We will name it *X*.
+
+```{r}
+library(xts)
+X <- xts(x, order.by=idx)
+str(X)
+head(X,10)
+```
+As you can see from the structure of an `xts` objevct, it contains both a data component and an index, indexed by an objevct of class `Date`.
+
+**xtx constructor**
+```
+xts(x=Null,
+    order.by=index(x),
+    frequency=NULL,
+    unique=NULL,
+    tzone=Sys.getenv("TZ"))
+```
+As mentioned previous, the two most important arguments are ```x``` and ```order.by```.  In fact, we only use these two arguments to create a xts object before.
+
+
+With a xts object, one can decompose it.
+
+### Deconstructing xts
+```coredata()``` is used to extract the data component
+```{r}
+head(coredata(X),5)
+```
+
+```index()``` is used to extract the index (aka times)
+```{r}
+head(index(X),5)
+```
+  
+### Conversion to xts from other time-series objects
+
+We will use the same dataset "bls_unemployment.csv" that we used in the last live session to illustarte the functions below.
+
+
+```{r}
+df <- read.csv("bls_unemployment.csv", header=TRUE, stringsAsFactors = FALSE)
+
+# Examine the data structure
+  str(df)
+  names(df)
+  head(df)
+  tail(df)
+
+#table(df$Series.id, useNA = "always")
+#table(df$Period, useNA = "always")
+
+# Convert a column of the data frame into a time-series object
+unemp <- ts(df$Value, start = c(2007,1), end = c(2017,1), frequency = 12)
+  str(unemp)
+  head(cbind(time(unemp), unemp),5)
+
+# Now, let's convert it to an xts object
+df_matrix <- as.matrix(df)
+  head(df_matrix)
+  str(df_matrix)
+  rownames(df)
+
+unemp_idx <- seq(as.Date("2007/1/1"), by = "month", length.out = 
+length(df[,1]))
+  head(unemp_idx)
+
+unemp_xts <- xts(df$Value, order.by = unemp_idx)
+  str(unemp_xts)
+  head(unemp_xts)
+```
+
+# Task 3:
+
+  1. Read 
+    A. Section 3.2 of "xts: Extensible Time Series" by Jeffrey A. Ryan and Joshua M. Ulrich
+    
+  2. Follow the following section of this document
+  
+# Merging and modifying time series
+
+One of the key strengths of ```xts``` is that it is easy to join data by column and row using a only few different functions. It makes creating time series datasets almost effortless.
+
+The important criterion is that the xts objects must be of identical type (e.g. integer + integer), or be POSIXct dates vector, or be atomic vectors of the same type (e.g. numeric), or be a single NA. It does not work on data.frames with various column types.
+
+The major functions is ```merge```.  It works like ```cbind``` or SQL's ```join```:
+
+Let's look at an example. It assumes that you are familiar with concepts of inner join, outer join, left join, and right join.
+
+```{r}
+library(quantmod)
+getSymbols("TWTR")
+head(TWTR)
+str(TWTR)
+```
+
+Note that the date obtained from the getSymbols function of the quantmod library is already an xts object.  As such, we can merge it directly with our unemployment rate xts object constructed above. Nevertheless, it is instructive to examine the data using the View() function to ensure that you understand the number of observations resulting from the joined series.
+
+```{r}
+# 1. Inner join
+TWTR_unemp01 <- merge(unemp_xts, TWTR, join = "inner")
+  str(TWTR_unemp01)
+  head(TWTR_unemp01)
+
+# 2. Outer join (filling the missing observations with 99999)
+# Basic argument use
+TWTR_unemp02 <- merge(unemp_xts, TWTR, join = "outer", fill = 99999)
+  str(TWTR_unemp02)
+  head(TWTR_unemp02)
+  #View(TWTR_unemp02)
+
+# Left join
+TWTR_unemp03 <- merge(unemp_xts, TWTR, join = "left", fill = 99999)
+  str(TWTR_unemp03)
+  head(TWTR_unemp03)
+  #View(TWTR_unemp03)
+  
+# Right join
+TWTR_unemp04 <- merge(unemp_xts, TWTR, join = "right", fill = 99999)
+  str(TWTR_unemp04)
+  head(TWTR_unemp04)
+  #View(TWTR_unemp04)
+```
+
+# Missing value imputation
+xts also offers methods that allows filling missing values using last or previous observation. Note that I include this simply to point out that this is possible. I by no mean certify that this is the preferred method of imputing missing values in a time series.  As I mentioned in live session, the specific method to use in missing value imputation is completely context dependent.
+
+Filling missing values from the last observation
+```{r}
+# First, let's replace the "99999" values with NA and then exammine the series. 
+
+# Let's examine the first few dozen observations with NA
+TWTR_unemp02['2013-10-01/2013-12-15'][,1]
+
+# Replace observations with "99999" with NA and store in a new series
+unemp01 <- TWTR_unemp02[, 1]
+unemp01['2013-10-01/2013-12-15']
+str(unemp01)
+head(unemp01)
+#TWTR_unemp02[, 1][TWTR_unemp02[, 1] >= 99990] <- NA
+
+unemp02 <- unemp01
+unemp02[unemp02 >= 99990] <- NA
+
+cbind(unemp01['2013-10-01/2013-12-15'], unemp02['2013-10-01/2013-12-15'])
+
+# Impute the missing values (stored as NA) with the last observation
+TWTR_unemp02_v2a <- na.locf(TWTR_unemp02[,1], 
+                            na.rm = TRUE, fromLast = TRUE) 
+unemp03 <- unemp02
+unemp03 <- na.locf(unemp03, na.rm = TRUE, fromLast = FALSE);
+
+# Examine the pre- and post-imputed series
+cbind(TWTR_unemp02['2013-10-01/2013-12-30'][,1], TWTR_unemp02_v2a['2013-10-01/2013-12-15'])
+
+cbind(unemp01['2013-10-01/2013-12-15'], unemp02['2013-10-01/2013-12-15'],
+unemp03['2013-10-01/2013-12-15'])
+```
+
+Another missing value imputation method is linear interpolation, which can also be easily done in xts objects. In the following example, we use linear interpolation to fill in the NA in between months.  The result is stored in ```unemp04```. Note in the following the different ways of imputing missing values.
+
+```{r}
+unemp04 <- unemp02
+unemp04['2013-10-01/2014-02-01']
+unemp04 <- na.approx(unemp04, maxgap=31)
+unemp04['2013-10-01/2014-02-01']
+
+round(cbind(unemp01['2013-10-01/2013-12-15'], unemp02['2013-10-01/2013-12-15'],
+unemp03['2013-10-01/2013-12-15'],
+unemp04['2013-10-01/2013-12-15']),2)
+```
+
+## Calculate difference in time series
+A very common operation on time series is to take a difference of the series to transform a non-stationary serier to a stationary series. First order differencing takes the form $x(t) - x(t-k)$ where $k$ denotes the number of time lags. Higher order differences are simply the reapplication of a difference to each prior result (like a second derivative or a difference of the difference).
+
+Let's use the ```unemp_xts``` series as examples:
+```{r}
+str(unemp_xts)
+unemp_xts
+ 
+diff(unemp_xts, lag = 1, difference = 1, log = FALSE, na.pad = TRUE)
+
+# calculate the first difference of AirPass using lag and subtraction
+#AirPass - lag(AirPass, k = 1)
+
+# calculate the first order 12-month difference if AirPass
+diff(unemp_xts, lag = 12, differences = 1)
+```
+
+# Task 4:
+
+  1. Read 
+    A. Section 3.4 of "xts: Extensible Time Series" by Jeffrey A. Ryan and Joshua M. Ulrich
+    
+    B. the following questions in "xts FAQ"
+        a. I am using apply() to run a custom function on my xts series. Why the returned matrix has di↵erent dimensions than the original one?
+
+  2. Follow the following two sections of this document
+
+# Apply various functions to time series
+
+The family of ```apply``` functions perhaps is one of the most powerful R function families. In time series, ```xts``` provides ```period.apply```, which takes (1) a time series, (2) an index of endpoints, and (3) a function to apply.  It takes the following general form:
+```
+period.apply(x, INDEX, FUN, ...)
+```
+
+As an example, we use the Twitter stock price series (to be precise, the daily closing price), create an index storing the points corresopnding to the weeks of the daily series, and apply functions to calculate the weekly mean. 
+
+```{r}
+# Step 1: Identify the endpoints; in this case, we use weekly time interval. That is, we extract the end index on each week of the series
+
+#View(TWTR)
+head(TWTR)
+TWTR_ep <- endpoints(TWTR[,4], on = "weeks")
+#TWTR_ep
+
+# Step 2: Calculate the weekly mean
+TWTR.Close_weeklyMean <- period.apply(TWTR[, 4], INDEX = TWTR_ep, FUN = mean)
+head(round(TWTR.Close_weeklyMean,2),8)
+```
+
+The power of the apply function really comes with the use of custom-defined function. For instance, we can easily 
+
+```{r}
+f <- function(x) {
+  mean <- mean(x)
+  quantile <- quantile(x,c(0.05,0.25,0.50,0.75,0.95))
+  sd <- sd(x)
+  
+  result <- c(mean, sd, quantile)
+  return(result)
+}
+head(round(period.apply(TWTR[, 4], INDEX = TWTR_ep, FUN = f),2),10)
+```
+
+# Calculate basic rolling statistics  of series by month
+Using ```rollapply```, one can calculate rolling statistics of a series:
+
+```{r}
+# Calculate rolling mean over a 10-day period and print it with the original series
+head(cbind(TWTR[,4], rollapply(TWTR[, 4], 10, FUN = mean, na.rm = TRUE)),15)
+```
+
+# Task 5:
+1. Read AMAZ.csv and UMCSENT.csv into R as R DataFrames
+
+2. Convert them to xts objects
+
+3. Merge the two set of series together, perserving all of the obserbvations in both set of series
+    a. fill all of the missing values of the UMCSENT series with -9999
+    
+    b. then create a new series, named UMCSENT02, from the original  UMCSENT series replace all of the -9999 with NAs
+    
+    c. then create a new series, named UMCSENT03, and replace the NAs with the last observation
+    
+    d. then create a new series, named UMCSENT04, and replace the NAs using linear interpolation.
+    
+    e. Print out some observations to ensure that your merge as well as the missing value imputation are done correctly. I leave it up to you to decide exactly how many observations to print; do something that makes sense. (Hint: Do not print out the entire dataset!)
+
+4. Calculate the daily return of the Amazon closing price (AMAZ.close), where daily return is defined as $(x(t)-x(t-1))/x(t-1)$. Plot the daily return series.
+
+5. Create a 20-day and a 50-day rolling mean series from the AMAZ.close series.

@@ -1,0 +1,39 @@
+---
+title: "Applying the Regression Anatomy Formula"
+author: "Adam Yang"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Open R and verify that the mtcars dataset is automatically loaded.
+```{R}
+head(mtcars)
+```
+
+You are interested in the following model:
+
+\begin{center}$hp = \beta_0 + \beta_1wt + u$\end{center}
+
+Your task is to compute the ols estimate for $\beta_1$, using the simple regression formula,
+
+\begin{center}$\hat{\beta_1} = \frac{\hat{cov}(y,x)}{\hat{var}(x)}$\end{center}
+
+  1. Use R to compute the numerator.
+  
+  2. Use R to compute the denominator.
+  
+  3. Explain, in a sentence or two, why this method works to compute $\beta_1$.
+  
+```{R}
+y <- mtcars$hp
+x <- mtcars$wt
+beta1_num <- cov(y,x)
+beta1_den <- var(x)
+beta1 <- beta1_num/beta1_den
+beta1_num
+beta1_den
+beta1
+```

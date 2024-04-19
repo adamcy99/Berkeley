@@ -1,0 +1,161 @@
+---
+title : 'Krysten Thompson w271: Homework 7'
+author: "Professor Jeffrey Yau"
+output: 
+  pdf_document:
+  toc: true
+  number_sections: true
+fontsize: 11pt
+geometry: margin=1in
+---
+
+In this homework, you are asked to use `quantmod` to get a time sereis `HOUST` from the Federal website, conduct Time Series EDA, examine seasonality, develop a model that can capture both trend and seasonality in the series, and plot the observed vs fitted value, and use the model to make a 12-step ahead forecast.
+
+```{r message=FALSE}
+rm(list = ls())
+
+# Load required libraries
+library(car)
+library(dplyr)
+library(astsa)
+library(forecast)
+library(fpp2)
+library(ggplot2)
+library(plotly)
+library(quantmod)
+
+# Insert the function to *tidy up* the code when they are printed out
+library(knitr)
+opts_chunk$set(tidy.opts=list(width.cutoff=60),tidy=TRUE)
+
+```
+
+```{r message=FALSE}
+# Use Quantmod to load data
+HOUST = getSymbols('HOUST', src='FRED', auto.assign = F) 
+
+#str(HOUST)   I commented these out to save space
+#head(HOUST)
+#tail(HOUST)
+
+house.starts = ts(HOUST, frequency = 12, start = c(1959,1))
+```
+
+```{r}
+# subset your time series to one starting in Januagy 2010
+
+house.starts.Jan2010 <- window(house.starts, start=c(2010, 1)) 
+#house.starts.Jan2010
+```
+
+\newpage
+# Examine your data
+
+```{r}
+ggplot(house.starts.Jan2010, aes(x=time(house.starts.Jan2010), y=house.starts.Jan2010)) +
+  geom_line(colour = "navy", size = 1) +
+  ggtitle("Housing Starts by Year (Starting in 2010)") +
+  theme(axis.title = element_text(size = rel(1.0)))
+```
+
+
+```{r}
+plot(aggregate(house.starts.Jan2010), main = "Housing Starts Trend (2010-2018)")
+```
+
+# Examine seasonality
+
+```{r}
+boxplot(house.starts.Jan2010 ~ cycle(house.starts.Jan2010),
+        main= "Housing Starts Seasonality (by Month)")
+```
+
+```{r}
+ggseasonplot(house.starts.Jan2010, year.labels = TRUE, year.labels.left = TRUE) +
+  ylab("Housing Starts") + ggtitle("Seasonal Plot: Housing Starts by Month by Year")
+```
+
+```{r}
+ggsubseriesplot(house.starts.Jan2010) + ylab("Housing Starts") +
+  ggtitle("Seasonal Subseries Plot of Housing Starts by Month")
+```
+
+# Estimate a model with trend, seasonlity, or both
+
+```{r}
+mod.trend <- lm(house.starts.Jan2010 ~ time(house.starts.Jan2010))
+summary(mod.trend)
+```
+
+**I was curious what model looked like when I called "tslm".**
+
+```{r}
+fit.tslm <- tslm(house.starts.Jan2010 ~ trend + season)
+summary(fit.tslm)
+```
+
+\newpage
+# Plot the observed and fitted values
+
+**I tried several iterations here.**
+
+```{r}
+plot(house.starts.Jan2010, ylab = "Housing Starts Trend")
+lines(mod.trend$fitted.values, col= 'red')
+```
+
+```{r}
+autoplot(house.starts.Jan2010, series="Data") +
+  autolayer(fitted(fit.tslm), series="Fitted") +
+  xlab("Year") + ylab("Housing Starts") +
+  ggtitle("Housing Starts: 2010 - 2018")
+```
+
+
+# Make a 12-step ahead (out-of-sample) forecast 
+# That is, forecast from 2018-10-01 to 2019-09-01
+
+**I played around with various iterations below for practice.**
+
+```{r}
+fcast <- forecast(fit.tslm, h=3)
+
+autoplot(fcast) + ggtitle("Forecasted Housing Starts: Oct 1, 2018 -
+                          Jan 9, 2019") + xlab("Month") + ylab("Forecasted
+                                                              Housing Starts")
+```
+
+
+```{r}
+f1 <- forecast(fit.tslm, h=3)
+plot(f1)
+```
+
+
+**Wanted to see if forecast would change using smaller window of historical data.**
+
+```{r}
+house.2014 <- window(house.starts, start=c(2014, 1)) 
+fit.2014 <- tslm(house.2014 ~ trend + season)
+```
+
+```{r}
+fcast <- forecast(fit.2014, h=3)
+
+autoplot(fcast) + ggtitle("Forecasted Housing Starts: Oct 1, 2018 -
+                          Jan 9, 2019") + xlab("Month") + ylab("Forecasted
+                                                              Housing Starts")
+```
+
+```{r}
+fcast.6 <- forecast(fit.2014, h=6)
+
+autoplot(fcast.6) + ggtitle("Forecasted Housing Starts: Oct 1, 2018 -
+                          March 2019") + xlab("Month") + ylab("Forecasted
+                                                              Housing Starts")
+```
+
+
+
+
+

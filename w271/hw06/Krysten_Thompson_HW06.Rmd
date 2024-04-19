@@ -1,0 +1,168 @@
+---
+title : 'Krysten Thompson w271: Homework 6'
+author: "Professor Jeffrey Yau"
+output: 
+  pdf_document:
+  toc: true
+  number_sections: true
+fontsize: 11pt
+geometry: margin=1in
+---
+
+In this homework, you are asked to conduct Time Series EDA, develop a Time Trend Model, conduct model diagnostic analysis, and use the model to make forecasts.
+
+Load the file **"bls_unemployment.csv"**
+This file contains the monthly unemployment rate in the United States from January 2007 to January 2017. *Note that these data are NOT seasonally adjusted.*
+
+1. Load the csv file into a data.frame, calling it *df*, and examine the structure of the "raw" series after you load it into a data.frame.
+
+
+```{r}
+library(astsa)
+library(ggplot2)
+library(knitr)
+library(timeSeries)
+
+opts_chunk$set(tidy.opts=list(width.cutoff=60),tidy=TRUE)
+```
+
+```{r}
+df <- read.csv('bls_unemployment.csv')
+head(df)
+```
+
+```{r}
+str(df)
+```
+
+2. Convert it into a R time-series object, and examine the structure of the series after you convert the *df* into a time series object. What is the difference between the two structures?
+
+```{r}
+class(df)
+```
+
+```{r}
+df <- ts(df, start = c(2007, 1), freq = 12)
+class(df)
+```
+
+```{r}
+str(df)
+```
+
+```{r}
+head(df)
+```
+
+```{r}
+#describe(df) 
+
+#because I changed 'df' to ts, the describe function won't run
+```
+
+Suppose we want to approximate the unemployment rate between 2010 and 2017 using a linear time trend model. For this exercise, feel free to modify this dataset but be sure that you explain what you did and why.
+
+**I created a subset of the dataset, specifically data for 2010 through 2017. I created a new variable 'df.2010_2017'.**
+
+**First, I plotted the variable with no modification. But this showed the in-year trend (e.g. monthly data).**
+
+**Then I plotted the data and called 'aggregate' so that the plot would reflect a smooth linear time trend line.**
+
+```{r}
+df.2010_2017 <- window(df[, 4], start = c(2010, 1), end = c(2017, 1))
+plot(df.2010_2017, ylab = 'Unemployment Rate by Year', xlab = 'Year')
+```
+
+```{r}
+plot(aggregate(df.2010_2017))
+```
+
+
+3. Conduct EDA on the series.
+
+```{r}
+start(df); end(df); frequency(df)
+```
+
+```{r}
+plot(df[,4], ylab = 'Unemployment %', xlab = 'Year')
+```
+
+```{r}
+boxplot(df[,4] ~ cycle(df), ylab = '% Unemployment', xlab = 'Month', main = 'Boxplots of Unemployment by Month Aggregated 2007 - 2017')
+```
+
+```{r}
+sum(is.na(df))
+```
+
+
+4. Create a linear time trend model by regressing the unemployment rate on time. Interpret the model results. 
+  
+```{r}
+mod.lin <- lm(df[,4] ~ Year, data=df)
+summary(mod.lin)
+```
+
+**Coefficient for Year $(-0.15)$ suggests that for every year after 2007, unemployment decreases by ~$15\%$ per year.**
+
+**The intercept value is high likely due to the Great Recession starting in late 2007 and into 2008. The significant Standard Error of $115$ is a result of 2007 being low and then the unemployment rate spiking in 2008 and extending into 2010.**
+
+**While the p-value of $0.0085$ is <$0.05\%$, it's important to note the Multiple $R^2$ value of $0.0568$. Approximately $6\%$ of the variance in unemployment rate is due to time. This is because there are many confounding variables not included in this model that better explain the unemployment rate.**
+  
+5. Examine the residuals of this model as you would if it were a classical linear model. In addition, generate ACF and PACF plots of the residuals.
+
+**Because I discussed the residuals of summary(model) above, I created a residuals plot below using decompose and plotting "random".**
+
+```{r}
+df.decom <- decompose(df, "multiplicative")
+plot(ts(df.decom$random[7:115]), main= "Residuals Plot")
+```
+
+```{r}
+acf(df.decom$random[7:115], main="ACF Plot for Residuals")
+```
+
+```{r}
+pacf(df.decom$random[7:115], main = "PACF Plot for Residuals")
+```
+
+**I wanted to play around and see what happened when I plotted "Trends" and "Seasonal".**
+
+```{r}
+plot(ts(df.decom$trend[,4]), main= "Trends Plot")
+```
+
+```{r}
+plot(ts(df.decom$seasonal[7:115]), main= "Seasonal Plot")
+
+```
+
+
+6. Use this model to predict the unemployment rate in 2018 January (i.e. 12 months from the end of the sample). Do the result make sene? How about a prediction of the unemployment rate in 2020 December?
+
+**Gerard, I couldn't figure this out after extensive online searching. Gave it a try using 'auto.arima' but couldn't get it to print for Jan 2018.**
+
+```{r}
+# 
+library(forecast)
+# 
+# frcst_Jan <- forecast(mod.lin, n.ahead=12)
+# frcst_Jan
+```
+
+```{r}
+value <- data.frame(df[, 4])
+.months <- ts(value, frequency=12)
+fit <- auto.arima(.months)
+pred <- predict(fit, n.ahead=14)
+pred
+```
+
+
+
+
+
+
+
+

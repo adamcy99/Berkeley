@@ -1,0 +1,183 @@
+---
+title : 'w271: Homework 3 (Due: Week 4)'
+author: "Professor Jeffrey Yau"
+output: 
+  pdf_document:
+  toc: true
+  number_sections: true
+fontsize: 11pt
+geometry: margin=1in
+---
+
+# Due: 4pm Pacific Time on the Day of the Live Session of Week 4
+
+# Instructions (Please Read it Carefully!):
+
+*  $\textbf{Page limit of the pdf report: None, but please be reasonable}$
+* Page setup: 
+  * Use the following font size, margin, and linespace:
+    * fontsize=11pt
+    * margin=1in
+    * line_spacing=single
+
+* Submission:
+
+    * Each student submits his/her homework to the course github repo by the deadline; submission and revision made after the deadline will not be graded
+    
+    * Submit 2 files:
+        1. A pdf file that details your answers. Include all the R codes used to produce the answers. *Please do not suppress the codes in your pdf file.*
+        2. R markdown file used to produce the pdf file
+    * Use the following file-naming convensation; fail to do so will receive $10\%$ reduction in the grade:
+        * StudentFirstNameLastName_HWNumber.fileExtension
+        * For example, if the student's name is Kyle Cartman for homework 1, name your files as
+            * KyleCartman_HW1.Rmd
+            * KyleCartman_HW1.pdf
+    * Although it sounds obvious, please print your name on page 1 of your pdf and Rmd files.
+
+    * For statistical methods that we cover in this course, use only the R libraries and functions that are covered in this course. If you use libraries and functions for statistical modeling that we have not covered, you have to (1) provide an explanation of why such libraries and functions are used instead and (2) reference to the library documentation. **Lacking the explanation and reference to the documentation will result in a score of zero for the corresponding question.** For data wrangling and data visualization, you are free to use other libraries, such as dplyr, ggplot2, etc.
+
+  * For mathematical formulae, type them in your R markdown file. **Do not write them on a piece of paper, take a photo, and either insert the image file or sumbit the image file separately. Doing so will receive a $0$ for the whole question.**
+
+  *  Students are expected to act with regards to UC Berkeley Academic Integrity.
+
+
+\newpage
+
+In the live session of week 3, we discussed various ways of variable transformation. In this lab, you will practice using some of the variable transformation techniques and the concepts and techniques of applying a binary logistic regression covered in the first three weeks.
+This lab uses the `Mroz` data set that comes with the *car* library. We examine this dataset in one of our live sessions. 
+
+# Some start-up scripts
+```{r, message = FALSE}
+rm(list = ls())
+library(car)
+require(dplyr)
+library(Hmisc)
+library(stargazer)
+
+# Describe the structure of the data, such as the number of
+# observations, the number of variables, the variable names, 
+# and type of each of the variables, and a few observations of each of
+# the variables
+str(Mroz)
+
+# Provide summary statistics of each of the variables 
+describe(Mroz)
+
+# For datasets coming with a R library, we can put "?" in front of a
+# dataset to display, under the help window, the description of the 
+# datasets
+?Mroz
+```
+
+## Question 1:
+Estimate a binary logistic regression with `lfp`, which is a binary variable recoding the participation of the females in the sample, as the dependent variable. The set of explanatory variables includes `age`, `inc`, `wc`, `hc`, `lwg`, `totalKids`, and a quadratic term of `age`, called `age_squared`, where `totalKids` is the total number of children up to age $18$ and is equal to the sum of `k5` and `k618`.
+
+**Answer:**
+We first create a new varirables, such as the total number of kids and the quadratic term of age. Then, we estimate a binary logistic regression using the `glm()` function and display the estimation result.
+
+```{r}
+# Create new explanatory variables
+
+# Total number of kids
+Mroz['totalKids'] <- Mroz$k5 + Mroz$k618
+# Quadratic term of age (i.e. age squared)
+Mroz['age_squared'] <- Mroz$age^2
+
+# Estimate a bineary logistic regression with the variables specified in the questions
+mroz.glm1 <- glm(lfp ~ age + age_squared + inc + wc + lwg + totalKids, family = 'binomial', data = Mroz)
+# Note that another way to include a quadratic term is to include the transformation in the glm() function directly:
+#glm(lfp ~ age + I(age^2) + inc + wc + lwg + totalKids, family = 'binomial', data = Mroz)
+
+# Display the estimation results
+summary(mroz.glm1)
+
+```
+
+## Question 2: 
+Is the age effect statistically significant? 
+
+**Answer:**
+To test the statistical significance of the age effect, we will apply LRT using R's `anova()` function, and to do so, we will estimate a "restricted" model with the age variables, which include both `age` and `age_squared` in the "full" model. We will call the restricted model `mroz.glm2`. Note also that because age is entered the logistic regression as a quadratic function, testing the statistical significance of the age effect include testing multiple hypotheses.
+
+The model being estimated, surpressing the subscript for individuals, is
+
+$$
+log(\frac{\pi}{1-\pi}) = \beta_0 + \beta_1 age + \beta_2 age\_squared + \beta_3 inc + \beta_4 wc + \beta_5 lwg + \beta_6 totalKids
+$$
+
+where $\pi$ denotes the probability that a female participating in the labor force. That is, $P(lfp_i=1)$
+
+$$
+H_0: \beta_1 = 0 \text{ and } \beta_2 = 0 \\
+H_1: (\beta_1 \ne 0 \text{ and } \beta_2 = 0), \text{ or } (\beta_1 = 0 \text{ and } \beta_2 \ne 0), \text{ or } (\beta_1 \ne 0 \text{ and } \beta_2 \ne 0)
+$$
+
+*Note: I just explicitly write out all the alternative hypotheses.* In most case, the following expression is being used
+
+$$
+H_0: \beta_1 = 0 \text{ and } \beta_2 = 0 \\
+H_1: H_0 \text{ is not true}
+$$
+
+
+```{r}
+mroz.glm2 <- glm(lfp ~ inc + wc + lwg + totalKids, family = 'binomial', data = Mroz)
+
+# Display both Model 1 and Model 2
+stargazer(mroz.glm1, mroz.glm2, type = 'text')
+
+# Apply LRT
+anova(mroz.glm1, mroz.glm2, test = "LRT")
+```
+
+## Questions 3: 
+What is the effect of a decrease in age by $5$ years on the odds of labor force participation for a female who was $45$ years of age.
+
+**Answer:**
+Recall our model:
+$$
+log(\frac{\pi}{1-\pi}) = \beta_0 + \beta_1 age + \beta_2 age\_squared + \beta_3 inc + \beta_4 wc + \beta_5 lwg + \beta_6 totalKids
+$$
+
+The odds ratio for an increase in age by $5$ is expressed in the following formula:
+$$
+OR = exp(5 \beta_1 + 5 \beta_2(2 \times age + 5) )
+$$
+which depends on the level of age.
+
+Let's compute the numerical change of the odds ratio by inserting the estimates to the formula above from the model stored in `mroz.glm1`, which is used here because we have tested that the age effect is significant.
+```{r}
+c = -5
+age = 45
+
+OR.change = exp(c*(coefficients(mroz.glm1)[['age']] + coefficients(mroz.glm1)[['age_squared']]*(2*age + c)))
+
+OR.change
+```
+
+**Therefore, the estimated odds of labor force participation (lfp) of females who are $45$ years of age increase by $1.18$ times.**
+
+## Question 4: 
+Estimate the profile likelihood confidence interval of the probability of labor force participation for females who were $40$ years old, had income equal to $20$, did not attend college, had log wage equal to 1, and did not have children.
+
+**Answer:**
+
+```{r}
+library(mcprofile)
+
+# Define the contrast matrix
+K = matrix(data = c(1, 40, 40^2, 20, 0, 1, 0), nrow = 1, ncol = 7)
+
+# Calculate -2log(Lambda)
+linear.combo = mcprofile(object = mroz.glm1, CM = K)
+
+# CI for the linear prredictor
+ci.logit.profile <- confint(object = linear.combo, level = 0.95)
+ci.logit.profile
+
+names(ci.logit.profile)
+
+# CI for probability 
+exp(ci.logit.profile$confint)/(1 + exp(ci.logit.profile$confint))
+```
+

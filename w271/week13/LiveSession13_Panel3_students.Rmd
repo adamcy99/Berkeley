@@ -1,0 +1,94 @@
+---
+title: 'W271 Live Session 13: Linear Mixed Effect Models - Application to Hierarchical
+  Data'
+author: "Professor Jeffrey Yau"
+date: "Spring 2019"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+# Main topics covered in Week 13
+  -Linear mixed-effect model
+      - The notion of fixed and random effects in the context of linear mixed effect model
+      - The independence assumption
+      - Modeling random intercepts, slopes, and both random intercepts and slopes
+      - Mathematical formulation, estimation, model diagnostics, model identification, model selection, assumption testing, and statistical inference / forecasting, backtesting
+
+# Readings:
+**BMBW** Douglas Bates, Martin Machler, Benjamin Bolker, and Steve Walker. *Fitting Linear Mixed Effect Models Using lme4*
+
+# Agenda:
+
+  1. Discuss linear mixed effect model
+  2. Questions, Comments, Feedbacks?
+
+# Linear Mixed Effect Model
+
+Mixed model analysis provides a general, flexible approach in these situations, because it allows a wide variety of correlation patterns (or variance-covariance structures) to be explicitly modeled.
+
+  - multi-level modeing
+
+  - applications in a wide range of disciplines, such as ecological and biological sciences.
+  
+    - different grouping factors like populations, species, sites we collect the data at etc
+
+
+*********************************
+
+Some start-up codes:
+```{r}
+#sessionInfo()
+
+# Insert the function to *tidy up* the code when they are printed out
+library(knitr)
+opts_chunk$set(tidy.opts=list(width.cutoff=60),tidy=TRUE)
+
+# Clean up the workspace before we begin
+rm(list = ls())
+
+# Set working directory
+#wd <- "~/Documents/Teach/Cal/w271/_2018.03_Fall/live-session-files/week11"
+#setwd(wd)
+
+# Load libraries
+library(dplyr)
+library(Hmisc)
+library(ggplot2)
+#library(lattice)
+#library(plm)
+library(car)
+library(MASS)
+library(lme4)
+library(foreign)
+library(gplots)
+library(stargazer)
+```
+
+# 1. Exploratory data analysis of panel data
+
+In this example, we use a dataset from an experiment to measure productivityon a manufacturing task according to the type of machine used and the operator. Our team is specifically interested in the productivity generated based on these machines. Unfortunately, as in many other real world examples, this is the only information we have.
+
+**Tasks:** 
+    - Import the data into R as a data.frame
+    - Examine the basic structure of each of the datasets
+    - Try to understand each of the variables
+    - Discuss about the dataset
+    - At what level is this dataset?
+    - Conduct a throughout EDA; use techniques we have covered since week 12
+
+```{r}
+df <- read.csv("data1_wk13_panel03.csv", sep=",", header=T)
+# YOUR CODE HERE
+```
+
+
+
+# 2. Build a Linear Mixed Effect Model 
+
+Develop a linear mixed effect model to answer our team's interest (posted above). You will need to experiment with a series of linear mixed effect model. Make sure your group discuss the interpretation of your final model.
+
+```{r}
+# YOUR CODE HERE
+```
+

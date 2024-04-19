@@ -1,0 +1,73 @@
+---
+title: "Unit 12 Pre-Class Excercise"
+subtitle: 'w203: Statistics for Data Science'
+author: "Adam Yang"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{R}
+load("elects.Rdata")
+```
+
+The `spending` data frame contains simulated data on election results and campaign spending in the U.S. The `dshare` and `rshare` variables capture the vote shares for the Democratic and Republican parties respectively, while `spent` measures total spending on advertisements in millions of dollars for each race. For this exercise, think of spending as the outcome variable and the vote share variables as predictors.
+
+```{R}
+head(spending)
+```
+
+  1.  Is there a linear relationship between campaign spending and democratic vote share? Generate a scatter plot with a regression line. What does this scatter plot suggest about the appropriateness of the classical linear model assumptions in this case?
+  
+```{R}
+model1 <- lm(spent~dshare, data = spending)
+plot(spending$dshare,spending$spent)
+abline(model1, col = "red")
+plot(model1)
+summary(model1)$r.squared
+model1$coefficients
+```
+
+It looks like a lot of the variation in `spent` cannot be explained by dshare alone. The residuals vs fitted value plot shows a lot of variance as well as a slight curve, suggesting that the residuals are not completely unbiased. The Q-Q plot is very non-linear, which is driven by the positive skew in the `spent` variable. A log transform on `spent` can fix this issue. 
+  
+  2. If we want to improve this model, we have two options - add more variables or transform the variables we have. Let's try to add another variable first. Note that the two vote share variables do not sum to one. This could be due to the existence of a third political party or to error in measuring votes. To begin with, what assumption would be violated if the two variables did sum to one?
+  
+```{R}
+sum <- spending$dshare + spending$rshare
+paste("The average of dshare + rshare is", mean(sum))
+plot(spending$dshare, spending$rshare)
+```
+
+As shown above, contrary to what the question says, `dshare` and `rshare` does in fact add up to 1 in this data set. Therefore, dshare and rshare violate the "no perfect multicolinearity" assumtion. We should not do a multivariable regression with `dshare` and `rshare` in this case.
+
+  3. Since the two variables don't sum exactly to one, we should be able to include republican vote share as a second predictor. But before doing any coding, ask yourself what adding republican voteshare will do to the precision of our estimate on the effect of democratic vote share. Explain why this effect makes sense.
+  
+Contrary to what the question says, `dshare` and `rshare` does actually sum exactly to one. Therefore we cannot include republican vote share as a second predictor. However, if we pretend that they do not sum exactly to one, we can utilize the following equations to figure out the impact of adding republican voteshare:
+
+$$spent = \beta_0 + \beta_1dshare + \beta_2rshare + u$$
+$$rshare = \alpha_0 + \alpha_1dshare + r_1$$
+In the first equation, we would assume that as `rshare` increases, `spent` would also increase so $\beta_2$ is probably positive. In the second equation, we would assume that as `dshare` increases, `rshare` would decrease because dshare would take away from rshare. Therefore, $\alpha_1$ would be negative. Since $\beta_1$ is positive, and $\alpha_1\beta_2$ is negative, it means the lack of rshare was making our $\beta_1$ slope coefficient seem smaller than it was. We should see a higher $\beta_1$ after we introduce `rshare` into the model.
+
+  4. Now generate a model that predicts campaign spending using both democratic and republican vote shares. What does the result tell you about the practical implications of very highly correlated predictors?
+  
+```{R}
+model2 <- lm(spent~dshare+rshare, data = spending)
+plot(model2)
+summary(model2)$r.squared
+model2$coefficients
+```
+Since `rshare` and `dshare` are perfectly colinear, we could not build a model with both variables. However, if they were not perfectly colinear, but in fact imperfectly colinear, then the OLS would remain unbiased but with an increased variance and covariance. As a result of increased variance and covariance, it would become more difficult to obtain a precise estimation of the coefficients, making the OLS less practical.
+  
+  5. Finally, what is the transformation of variables that might solve the problems identified thus far? Perform that transformation and describe the results.
+  
+```{R}
+model3 <- lm(log(spent)~log(dshare)+rshare, data = spending)
+plot(model3)
+summary(model3)$r.squared
+model3$coefficients
+plot(log(spending$dshare),spending$rshare)
+```
+
+First, I did a logrithmic transformation on `spent` to get rid of the positive skew as much as possible. Then I did a logrithmic transformation on `dshare` to force it to be less linear with `rshare`. However, `dshare` and `rshare` are perfectly co-linear so I don't think this is a wise choice. I think it would be best to only use one of these variables. 

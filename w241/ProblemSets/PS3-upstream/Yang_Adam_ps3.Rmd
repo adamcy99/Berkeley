@@ -1,0 +1,521 @@
+---
+title: "Problem Set 3"
+subtitle: "Experiments and Causality"
+author: "Adam Yang"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+<!--
+Some guidelines for submitting problem sets in this course:
+
+- Please submit a PDF document rather than a Word document or a Google document.
+- Please put your name at the top of your problem set.
+- Please **bold** or *highlight* your numerical answers to make them easier to find.
+- If you'll be using `R` or `Python` code to calculate your answers, please put the code and its output directly into your Problem Set PDF document.
+- It is highly recommended, although not required, that you use the RMarkdown feature in RStudio to compose your problem set answers. RMarkdown allows you to easily intermingle analysis code and answers in one document. It is of a similar design as `jupyter` and an ipython notebook.
+- You do not need to show work for trivial calculations, but showing work is always allowed.
+- For answers that involve a narrative response, please feel free to describe the key concept directly and briefly, if you can do so, and do not feel pressure to go on at length.
+- Please ask us questions about the problem set if you get stuck. **Don't spend more than 20 minutes puzzling over what a problem means.** 
+- Please ensure that someone (us!) can compile your solution set. The best way is to use the web-hosted links we've provided.
+--> 
+
+```{r, results='hide'} 
+# load packages 
+library(data.table)
+library(foreign)
+library(lmtest)
+library(sandwich)
+library(multiwayvcov)
+```
+
+# 0 Write Functions 
+You're going to be doing a few things a *number* of times -- calculating robust standard errors, calculating clustered standard errors, and then calculating the confidence intervals that are built off these standard errors. 
+
+*After* you've worked through a few of these questions, I suspect you will see places to write a function that will do this work for you. Include those functions here, if you write them. 
+
+```{r}
+
+
+# Equation to calculate robust standard errors
+processrobust <- function(linReg, row, z_val){
+  # First create a summary of the linReg for confidence interval
+  model <- summary(linReg)
+  # Get Variance-Covariance matrix
+  vcov.robust <- vcovHC(linReg)
+  # Calculate standard errors by taking the sqrt of the diagonals of vcov
+  robust.se <- sqrt(diag(vcov.robust))
+  # Calculate the 95% confidence interval using cluster se
+  slope <- model$coefficients[row,1]
+  l_bound <- signif(slope - z_val*robust.se, 3)
+  u_bound <- signif(slope + z_val*robust.se, 3)
+  
+  # return lower bound, upper bound, cluster se
+  return(c(l_bound[row], u_bound[row], signif(robust.se[row],3)))
+}
+
+# Equation to calculate clustered standard errors and confidence interval
+processcluster <- function(linReg, row, z_val) {
+  # First create a summary of the linReg for confidence interval
+  model <- summary(linReg)
+  # Get clustered Variance-Covariance matrix
+  vcov.cluster <- cluster.vcov(linReg, ~ cluster)
+  # Calculate standard errors by taking the sqrt of the diagonals of vcov
+  cluster.se <- sqrt(diag(vcov.cluster))
+  # Calculate the 95% confidence interval using cluster se
+  slope <- model$coefficients[row,1]
+  l_bound <- signif(slope - z_val*cluster.se, 3)
+  u_bound <- signif(slope + z_val*cluster.se, 3)
+  
+  # return lower bound, upper bound, cluster se
+  return(c(l_bound[row], u_bound[row], signif(cluster.se[row],3)))
+}
+
+# Equation to calculate the default confidence interval
+
+conf.interval <- function(linReg, row, z_val) {
+  # 95% confidence interval = Estimate +/- 1.96(Std. Error)  slope <- model$coefficients[row,1]
+  model <- summary(linReg)
+  std.err <- model$coefficients[row,2]
+  slope <- model$coefficients[row,1]
+  l_bound <- signif(slope - z_val*std.err, 3)
+  u_bound <- signif(slope + z_val*std.err, 3)
+  
+  return(c(l_bound, u_bound))
+}
+
+```
+# 1 Replicate Results 
+Skim [Broockman and Green's](http://link.springer.com/article/10.1007/s11109-013-9239-z) paper on the effects of Facebook ads and download an anonymized version of the data for Facebook users only.
+
+```{r}
+d <- read.csv("./data/broockman_green_anon_pooled_fb_users_only.csv")
+``` 
+
+a. Using regression without clustered standard errors (that is, ignoring the clustered assignment), compute a confidence interval for the effect of the ad on candidate name recognition in Study 1 only (the dependent variable is "name_recall"). 
++ **Note**: Ignore the blocking the article mentions throughout this problem.
++ **Note**: You will estimate something different than is reported in the study. 
+
+```{r}
+
+Study1 <- d[d$studyno == 1,]
+
+# Use regression without clustered standard errors
+model1.a <- lm(name_recall~treat_ad, data = Study1)
+
+# Compute a confidence interval for the effect of the ad on name_recall
+c_int <- conf.interval(model1.a, row = 2, z_val = 1.96)
+
+# Compute a robust confidence interval for the effect of the ad on name_recall
+ans <- processrobust(model1.a, row = 2, z_val = 1.96)
+
+paste("The 95% confidence interval on only Study 1 w/o clustering is (", c_int[1],",",c_int[2],")")
+paste("The robust standard error is", ans[3])
+paste("The robust 95% confidence interval on only Study 1 w/o clustering is (", ans[1],",",ans[2],")")
+```
+
+b. What are the clusters in Broockman and Green's study? Why might taking clustering into account increase the standard errors?
+
+**Adam Yang:** In Broockman and Green's study, they performed clustering by age (or range of ages), gender, and location. For example, a specific cluster might be 24 year old males from New York. The clustered standard errors are larger when there is more variability of the cluster level means. Usually the average potential outcomes of each cluster can have high variability and therefore give us large standard errors based on the clustered standard error equation. However, if the cluster level potential outcomes have very small variability, it is possible for the clustered standard error to not be as big. 
+
+c. Now repeat part (a), but taking clustering into account. That is, compute a confidence interval for the effect of the ad on candidate name recognition in Study 1, but now correctly accounting for the clustered nature of the treatment assignment. If you're not familiar with how to calculate these clustered and robust estimates, there is a demo worksheet that is available in our course repository: `./code/week5clusterAndRobust.Rmd`.
+
+```{r}
+
+# Create regression
+model1.c <- lm(name_recall~treat_ad, data = Study1)
+# Put regression through function to get lbound, ubound, cluster.se
+ans <- processcluster(model1.c, row = 2, z_val = 1.96)
+
+paste("The clustered standard error for only Study 1 is", ans[3])
+paste("The 95% confidence interval on only Study 1 w/ clustering is (", ans[1],",",ans[2],")")
+```
+
+d. Repeat part (c), but now for Study 2 only.
+
+```{r} 
+Study2 <- d[d$studyno == 2,]
+
+# Create regression
+model1.d <- lm(name_recall~treat_ad, data = Study2)
+# Put regression through function to get lbound, ubound, cluster.se
+ans <- processcluster(model1.d, row = 2, z_val = 1.96)
+
+paste("The clustered standard error is", ans[3])
+paste("The 95% confidence interval on only Study 2 w/ clustering is (", ans[1],",",ans[2],")")
+```
+
+e. Repeat part (c), but using the entire sample from both studies. Do not take into account which study the data is from (more on this in a moment), but just pool the data and run one omnibus regression. What is the treatment effect estimate and associated p-value?
+
+**Note To Grader:** *I am assuming that for this question, we are still clustering by `cluster` column. The `cluster` column differentiates between "study 1 cluster 1" and "study 2 cluster 1". I am assuming that "study 1 cluster 1" and "study 2 cluster 1" are 2 very different clusters and therefore I don't have to create a new column with that removes the study number from the cluster names.*
+
+```{r}
+
+# Create regression
+model1.e <- lm(name_recall~treat_ad, data = d)
+# Put regression through function to get lbound, ubound, cluster.se
+ans <- processcluster(model1.e, row = 2, z_val = 1.96)
+# Use coeftest to find the cluster-robust p value
+coeftestvalues <- coeftest(model1.e, cluster.vcov(model1.e, ~ cluster))
+
+paste("The clustered standard error is", ans[3])
+paste("The 95% confidence interval on the entire sample w/ clustering is (", ans[1],",",ans[2],")")
+paste("The treatment effect estimate is", signif(summary(model1.e)$coefficients[2,1],3))
+# I don't think the following line is necessary but I kept it in anyways
+paste("The associated p-value is", signif(summary(model1.e)$coefficients[2,4],3))
+paste("The associated cluster-robust p-value is", signif(coeftestvalues[2,4],3))
+```
+
+f. Now, repeat part (e) but include a dummy variable (a 0/1 binary variable) for whether the data are from Study 1 or Study 2. What is the treatment effect estimate and associated p-value?
+
+```{r}
+# Create new dataframe but create a dummy variable for study number
+data1f <- d
+data1f$isStudy2 <- ifelse(data1f$studyno == 2, 1, 0)
+
+# Create regression, but this time include dummy variable
+model1.f <- lm(name_recall~treat_ad + isStudy2, data = data1f)
+
+# Put regression through function to get lbound, ubound, cluster.se
+ans <- processcluster(model1.f, row = 2, z_val = 1.96)
+
+# Use coeftest to find the cluster-robust p value
+coeftestvalues <- coeftest(model1.f, cluster.vcov(model1.f, ~ cluster))
+
+paste("The clustered standard error is", ans[3])
+paste("The 95% confidence interval on the entire sample w/ clustering is (", ans[1],",",ans[2],")")
+paste("The treatment effect estimate with dummy variable is", signif(summary(model1.f)$coefficients[2,1],3))
+# I don't think the following line is necessary but I kept it in anyways
+paste("The associated p-value is", signif(summary(model1.f)$coefficients[2,4],3))
+paste("The associated cluster-robust p-value is", signif(coeftestvalues[2,4],3))
+```
+
+g. Why did the results from parts (e) and (f) differ? Which result is biased, and why? (Hint: see pages 75-76 of Gerber and Green, with more detailed discussion optionally available on pages 116-121.)
+
+**Adam Yang:** The two results differ because one of them does not take into account which study the data is from and therefore, completely ignoring the differences between the two studies. The result in part (e) is biased because it does not take into consideration how study 1 and study 2 might have different treatment assignment rates. In other words, when the probability of being assigned to the treatment group varies by block between study 1 and study 2, you can get a biased estimate of the ATE if you don't take this into consideration in your regression. Part (f), on the other hand, introduces a dummy variable as a covariate which helps take account of the impact of the data being from study 2 rather than study 1.
+
+h. Skim this [Facebook case study](https://www.facebook.com/notes/us-politics-on-facebook/case-study-reaching-voters-with-facebook-ads-vote-no-on-8/10150257619200882) and consider two claims they make reprinted below. Why might their results differ from Broockman and Green's? Please be specific and provide examples.
+
+  + "There was a 19 percent difference in the way people voted in areas where Facebook Ads ran versus areas where the ads did not run."
+  + "In the areas where the ads ran, people with the most online ad exposure were 17 percent more likely to vote against the proposition than those with the least."
+  
+**Adam Yang:** The results of the two experiments may differ because of the many differences between the two experiments. One major difference is that Chong and Koster studied the effects on the "Vote no on 8 in Florida" campaign while Broockman and Green studied the effects on a Republican state legislative candidate in a non-battleground state as well as the effects on a Democratic congressional candidate in a non-battleground state. In one case we are studying the treatment effect on an amendment, while in the other case, we are studying the treatment effect on candidates running for certain offices. People can possibly have very different reactions to Facebook ads based on amendments versus candidates. Also, Chong and Koster's experiment took place in 2010 while Broockman and Green's experiment took place in 2012. Facebook is a rapidly growing social media platform so the time difference between 2010 and 2012 might have a huge impact on the UI of Facebook, people's attitude towards ads on Facebook, the number and type of people who have a Facebook account, among many other different possible differences. Also, in Chong and Koster's experiment, they focused on two of the most populated counties in Florida to do their experiment. It is not clear which non-battleground states Broockman and Green carried out their experiments but the treatment effect on these different locations can be very different. There may be many other reasons why the two experiments are different, but in summary, you cannot compare the results from the two experiments because it would not be an apples to apples comparison.
+
+# 2 Peruvian Recycling 
+
+Look at [this article](https://drive.google.com/file/d/0BxwM1dZBYvxBVzQtQW9nbmd2NGM/view?usp=sharing) about encouraging recycling in Peru.  The paper contains two experiments, a "participation study" and a "participation intensity study."  In this problem, we will focus on the latter study, whose results are contained in Table 4 in this problem.  You will need to read the relevant section of the paper (starting on page 20 of the manuscript) in order to understand the experimental design and variables.  (*Note that "indicator variable" is a synonym for "dummy variable," in case you haven't seen this language before.*)
+
+a. In Column 3 of Table 4A, what is the estimated ATE of providing a recycling bin on the average weight of recyclables turned in per household per week, during the six-week treatment period?  Provide a 95% confidence interval.
+
+**Adam Yang:** The estimated ATE of providing a recycling bin on the average weight of recyclables turned in per household per week is **0.187kg**. The 95% confidence interval can be calculated by $coef \pm1.96*se = 0.187\pm1.96*0.032$. Therefore, the 95% confidence interval is between **0.124kg** and **0.250kg**. This result is statistically significant according to the table.
+
+b. In Column 3 of Table 4A, what is the estimated ATE of sending a text message reminder on the average weight of recyclables turned in per household per week?  Provide a 95% confidence interval.
+
+**Adam Yang:** The estimated ATE of sending a text message reminder on the average weight of recyclables turned in per household per week is **-0.024kg**. The 95% confidence interval can be calculated by $coef \pm1.96*se = -0.024\pm1.96*0.039$. Therefore, the 95% confidence interval is between **-0.100kg** and **0.0524kg**. According to the table, this result is not statistically significant.
+
+c. Which outcome measures in Table 4A show statistically significant effects (at the 5% level) of providing a recycling bin?
+
+**Adam Yang:** The outcome measures of: percentage of visits turned in bag, average number of bins turned in per week, average weight (in kg) of recyclables turned in per week, and average market value of recyclables given per week. In other words, only the outcome measure shown in column 5 did not show a statistically significant effect of providing recycling bin.
+
+d. Which outcome measures in Table 4A show statistically significant effects (at the 5% level) of sending text messages?
+
+**Adam Yang:** None of the outcome measures in Table 4A show statistically significant effects of sending text messages.
+
+e. Suppose that, during the two weeks before treatment, household A turns in 2kg per week more recyclables than household B does, and suppose that both households are otherwise identical (including being in the same treatment group).  From the model, how much more recycling do we predict household A to have than household B, per week, during the six weeks of treatment?   Provide only a point estimate, as the confidence interval would be a bit complicated.  This question is designed to test your understanding of slope coefficients in regression.
+
+**Adam Yang:** The baseline coefficient for the average weight of recyclables turned in per week is 0.281. That means that for every 1kg of baseline recyclable that a household turns in, they will experience an additional 0.281kg of recycling during the treatment weeks. Therefore, we predict household A would have $2*0.281 = 0.562kg$ more recycling than household B per week during the treatment weeks.
+
+f. Suppose that the variable "percentage of visits turned in bag, baseline" had been left out of the regression reported in Column 1.  What would you expect to happen to the results on providing a recycling bin?  Would you expect an increase or decrease in the estimated ATE?  Would you expect an increase or decrease in the standard error?  Explain your reasoning.
+
+**Adam Yang:** If the variable "percentage of visits turned in bag, baseline" had been left out of the regression, the resulting coefficients of each of your variables are expected to change though it is not necessarily clear which direction they will change. It seems that the baseline is positively correlated to the outcome variable. If providing a recycling bin causes an increase in the baseline, then we can expect an increase in the estimated ATE on providing a recycling bin. However, I am not sure if this is the case so I am not sure of the direction of the change. It is also possible that there would be little or no change to the estimated ATE. The standard error will go up because the variance in the measurements captured from this variable will be re-absorbed into our error term.
+
+g. In column 1 of Table 4A, would you say the variable "has cell phone" is a bad control?  Explain your reasoning.
+
+**Adam Yang:** Because "has cell phone" is not a post treatment variable, I would not say it is a bad control. In fact, I think it is a covariate that is important to include because one of our treatment variables is whether or not participants received texts to remind them to recycle. I cannot think of a reason for how the outcome variable would cause the participant to own a cellphone or not. Furthermore, the status of having a cellphone has been obtained before the experiment was conducted. "has cell phone"" is not a statically significant variable, but that does not make it a bad control. 
+
+h. If we were to remove the "has cell phone" variable from the regression, what would you expect to happen to the coefficient on "Any SMS message"?  Would it go up or down? Explain your reasoning.
+
+**Adam Yang:** If we remove the "has cell phone" variable from the regression, then we would introduce an omitted variable bias to the coefficient on "Any SMS message". If you receive an SMS message, you are likely to have a cell phone so "has cell phone" is positively correlated with the "Any SMS message" variable. Furthermore, according to the paper, "cell phone owners in the participation study are slightly richer, more educated, and more interested in local affairs (especially recycling matters) than non-cell phone owners". This means that "has cell phone" is positively correlated with recycling participation intensity as well. Therefore, the omitted variable bias would've made the coefficient of "Any SMS message" larger than shown in Table 4A. 
+
+# 3 Multifactor Experiments 
+Staying with the same experiment, now lets think about multifactor experiments. 
+
+a. What is the full experimental design for this experiment?  Tell us the dimensions, such as 2x2x3.  (Hint: the full results appear in Panel 4B.)
+
+**Adam Yang:** The participation intensity experiment uses a sample frame of households that have already recycled through PRISMA previously. The participants are randomly assigned to receiving a recycling bin with a sticker, a recycling bin without a sticker, and no recycling bin at all. Furthermore, the participants are also randomly assigned to receive weekly personalized text message reminders, weekly generic text message reminders, and no text message at all.
+
+This is a 3x3 experiment because there are three groups for recycling bin and 3 groups for text messages. The groups for recycling bin are: bin provided with sticker with recycling information, bin provided with no sticker, and no bin (control). The groups for test messages are: personal SMS message reminding the person to recycle, generic SMS message reminding person to recycle, and no text message (control). TO DO: 3x4x5?
+
+b. In the results of Table 4B, describe the baseline category. That is, in English, how would you describe the attributes of the group of people for whom all dummy variables are equal to zero?
+
+**Adam Yang:** In table 4b, we have 5 different baseline categories. Each of these baseline categories store the baseline recycling intensity (measured differently in each baseline category) of the households prior to treatment. The attributes of the group of people for whom all dummy variables are equal to zero include not being given a recycling bin, not receiving SMS text reminders, and not owning a cell phone. The regression of this group of people can be predicted from only the baseline term.
+
+c. In column (1) of Table 4B, interpret the magnitude of the coefficient on "bin without sticker."  What does it mean?
+
+**Adam Yang:** The coefficient in column 1 on "bin without sticker" is 0.035. This means that, holding everything else constant, by giving a household a recycling bin without a sticker, you can expect the percentage of visits where the household turned in a bag to increase by 0.035 or 3.5%.
+
+d. In column (1) of Table 4B, which seems to have a stronger treatment effect, the recycling bin with message sticker, or the recycling bin without sticker?  How large is the magnitude of the estimated difference?
+
+**Adam Yang:** The ATE of recycling bin with message sticker is 0.055 while the recycling bin without a sticker is 0.035. Both are statistically significant. It seems like recycling bin with message sticker has a stronger treatment effect. The magnitude of the estimated difference is 0.020. 
+
+e. Is this difference you just described statistically significant?  Explain which piece of information in the table allows you to answer this question.
+
+**Adam Yang:** The F-test p-value (1) = (2) is 0.31 which is not statistically significant. This means that we cannot reject the null hypothesis that the difference between coefficient (1) and coefficient (2) is 0. 
+
+f. Notice that Table 4C is described as results from "fully saturated" models.  What does this mean?  Looking at the list of variables in the table, explain in what sense the model is "saturated."
+
+**Adam Yang:** A fully saturated model means that each value of the covariate gets a different dummy variable to represent it. Furthermore, all the possible interactions between these dummy variables are also included in the regression model. In terms of table 4C, the model is saturated in regards to having all the interaction terms the three different types of bin groups. You can see interaction terms between the recycling bin dummy variables with each of the three SMS message dummy variables as well as the phone dummy variables. It is possible that they included the dummy variables themselves (ie. "Bin with sticker") and all the other interaction terms, but they are not shown in table 4C. They did mention that they had "indicators for each unique combination of treatments", underneath table 4C.
+
+# 4 Now! Do it with data 
+Download the data set for the recycling study in the previous problem, obtained from the authors. We'll be focusing on the outcome variable Y="number of bins turned in per week" (avg_bins_treat).
+
+```{r}
+d <- read.dta("./data/karlan_data_subset_for_class.dta")
+head(d)
+
+## Do some quick exploratory data analysis with this data. There are some values in this data that seem a bit strange. Determine what these are, and figure out what you would like to do with them. Also, notice what happens with your estimates vis-a-vis the estimates that are produced by the authors when you do something sensible with this strange values. 
+```
+
+```{r}
+summary(d)
+
+# Histogram of street
+hist(d$street)
+
+# Figure out how many rows have -999 for street
+paste("There are", nrow(d[d$street == -999,]), "rows in the `street` column with -999")
+```
+
+**Adam Yang:** Looking at the summary of the data, we notice that `street` and `havecell` have NA values while the other variables do not. Furthermore, `street` seems to be represented by integer ids, however, there are quite a few of them with values -999. I assume these are some kind of error output values written in the code that produces this data set. If we leave it in the data set, we are assuming all 123 of those data points have the same street, which doesn't make sense. I decided to remove all the rows with NA in `street` and `havecell` as well as all the rows with -999 in `street`.
+
+```{r}
+# Clean up the data set by removing rows with NA's and -999 from street and havecell
+cleaned_d <- d[!is.na(d$havecell) & !is.na(d$street) & d$street != -999,]
+```
+
+a. For simplicity, let's start by measuring the effect of providing a recycling bin, ignoring the SMS message treatment (and ignoring whether there was a sticker on the bin or not).  Run a regression of Y on only the bin treatment dummy, so you estimate a simple difference in means.  Provide a 95% confidence interval for the treatment effect.
+
+**Note to Grader:** I am using the robust standard error for each of the calculations below.
+
+```{r}
+model4a <- lm(avg_bins_treat~bin, data = cleaned_d)
+
+# Use previously defined equations to find robust confidence intervals
+ans <- processrobust(model4a, row = 2, z_val = 1.96)
+
+summary(model4a)
+paste("The treatment effect estimate is", signif(summary(model4a)$coefficients[2,1],3))
+paste("The robust standard error is", ans[3])
+paste("The 95% robust confidence interval is (", ans[1],",",ans[2],")")
+```
+
+b. Now add the pre-treatment value of Y as a covariate.  Provide a 95% confidence interval for the treatment effect.  Explain how and why this confidence interval differs from the previous one.
+
+```{r}
+model4b <- lm(avg_bins_treat ~ bin + base_avg_bins_treat, data = cleaned_d)
+
+# Use previously defined equations to find robust confidence intervals
+ans <- processrobust(model4b, row = 2, z_val = 1.96)
+
+summary(model4b)
+paste("The treatment effect estimate is", signif(summary(model4b)$coefficients[2,1],3))
+paste("The robust standard error is", ans[3])
+paste("The 95% robust confidence interval is (", ans[1],",",ans[2],")")
+```
+
+**Adam Yang:** From parts (a) and (b) we see that the confidence interval is slightly tighter when we introduce the pre-treatment value of Y as a covariate. The treatment effect also got smaller. The pre-treatment value of the Y as a covariate helps us better understand the variation of the data and therefore decreasing our robust standard error from 0.0213 to 0.0177. Therefore the confidence interval got tighter.
+
+c. Now add the street fixed effects.  (You'll need to use the R command factor().) Provide a 95% confidence interval for the treatment effect.  
+
+```{r}
+model4c <- lm(avg_bins_treat ~ bin + base_avg_bins_treat + factor(street), data = cleaned_d)
+
+# Use previously defined equations to find robust confidence intervals
+ans <- processrobust(model4c, row = 2, z_val = 1.96)
+
+summary(model4c)
+paste("The treatment effect estimate is", signif(summary(model4c)$coefficients[2,1],3))
+paste("The robust standard error is", ans[3])
+paste("The 95% robust confidence interval is (", ans[1],",",ans[2],")")
+```
+
+d. Recall that the authors described their experiment as "stratified at the street level," which is a synonym for blocking by street.  Explain why the confidence interval with fixed effects does not differ much from the previous one.
+
+**Adam Yang:** Blocking by street would reduce the probability that large treatment and control group differences occur by chance by balancing the presence of similar units across the treatment and control groups. In other words, blocking reduces the sampling variability if the variability between blocks is greater than the variability within each block. The streets that each household lives on can represent the wealth of that household so we can expect there to be variability between blocks. In terms of the confidence interval, we performed random assignment based on the blocks so the impact from within these blocks are already intrinsically included in the model. Adding the covariate would therefore not provide much more new information so the confidence interval does not change much. In other words, adding a covariate would absorb variability in the model. However, when you're blocking you are already minimizing that variability so adding the covarite would not have a large impact.
+
+e. Perhaps having a cell phone helps explain the level of recycling behavior. Instead of "has cell phone," we find it easier to interpret the coefficient if we define the variable " no cell phone."  Give the R command to define this new variable, which equals one minus the "has cell phone" variable in the authors' data set.  Use "no cell phone" instead of "has cell phone" in subsequent regressions with this data set.
+
+```{r}
+# Create new column with nocell variable
+cleaned_d$nocell <- 1-cleaned_d$havecell
+```
+
+f. Now add "no cell phone" as a covariate to the previous regression.  Provide a 95% confidence interval for the treatment effect.  Explain why this confidence interval does not differ much from the previous one.
+
+```{r}
+model4f <- lm(avg_bins_treat ~ bin + base_avg_bins_treat + factor(street) + nocell, data = cleaned_d)
+
+# Use previously defined equations to find robust confidence intervals
+ans <- processrobust(model4f, row = 2, z_val = 1.96)
+
+summary(model4f)
+paste("The treatment effect estimate is", signif(summary(model4f)$coefficients[2,1],3))
+paste("The robust standard error is", ans[3])
+paste("The 95% robust confidence interval is (", ans[1],",",ans[2],")")
+```
+
+**Adam Yang:** I think it is very likely that having a cell phone or not does not help explain the variability in the treatment effect of having a recycling bin. Therefore, because having a cell phone should not have much to do with having a recycling bin and the recycling intensity, it does not help tighten our confidence interval. It's also possible that having a cell phone or not also represents the economic class of the household. This information is already  provided in some way by the `street` variable, so not much more information is provided.
+
+g. Now let's add in the SMS treatment.  Re-run the previous regression with "any SMS" included.  You should get the same results as in Table 4A.  Provide a 95% confidence interval for the treatment effect of the recycling bin.  Explain why this confidence interval does not differ much from the previous one.
+
+**Note to Grader:** I used the cleaned up data set which removed the data points with street = -999 so the results are not exactly like the results in Table 4A. I did use the original data set to confirm that I got the same results as Table 4A if I did not clean the data.
+
+```{r}
+model4g <- lm(avg_bins_treat ~ bin + sms + base_avg_bins_treat + factor(street) + nocell, data = cleaned_d)
+
+# Use previously defined equations to find robust confidence intervals
+ans <- processrobust(model4g, row = 2, z_val = 1.96)
+
+summary(model4g)
+paste("The treatment effect estimate is", signif(summary(model4g)$coefficients[2,1],3))
+paste("The robust standard error is", ans[3])
+paste("The 95% robust confidence interval is (", ans[1],",",ans[2],")")
+```
+
+**Adam Yang:** The confidence interval did not seem to change too much. The confidence interval we are showing is the confidence interval around the estimated treatment effect of having a recycling bin or not. It seems like receiving an SMS text message does not decrease the variance of the treatment effect of having a recycling bin or not. Also, we already included the covariate of `nocell` which should be correlated with the `sms` covariate so we may not be getting much new information and thus the confidence interval does not change by much.
+
+h. Now reproduce the results of column 2 in Table 4B, estimating separate treatment effects for the two types of SMS treatments and the two types of recycling-bin treatments.  Provide a 95% confidence interval for the effect of the unadorned recycling bin.  Explain how your answer differs from that in part (g), and explain why you think it differs.
+
+```{r}
+model4h <- lm(avg_bins_treat ~ bin_g + bin_s + sms_p + sms_g + nocell + base_avg_bins_treat
+              + factor(street), data = cleaned_d)
+
+# Use previously defined equations to find robust confidence intervals
+ans <- processrobust(model4h, row = 2, z_val = 1.96)
+
+summary(model4h)
+paste("The treatment effect estimate is", signif(summary(model4h)$coefficients[2,1],3))
+paste("The robust standard error is", ans[3])
+paste("The 95% robust confidence interval is (", ans[1],",",ans[2],")")
+```
+
+**Adam Yang:** The 95% robust confidence interval for bins without stickers is (0.0547, 0.157) which is less tight compared to the confidence interval we got from part (g), which is (0.0785 , 0.155). The confidence intervals differ because one represents all households who received bins while the other represents only the households that received bins without stickers on them. It is possible that the confidence interval got wider because we introduced more variability along with more separate treatment effects. This increases the standard error which widens the confidence interval.
+
+# 5 A Final Practice Problem 
+Now for a fictional scenario. An emergency two-week randomized controlled trial of the experimental drug ZMapp is conducted to treat Ebola. (The control represents the usual standard of care for patients identified with Ebola, while the treatment is the usual standard of care plus the drug.) 
+
+Here are the (fake) data. 
+
+```{r}
+d <- read.csv("./data/ebola_rct2.csv")
+head(d)
+```
+
+You are asked to analyze it. Patients' temperature and whether they are vomiting is recorded on day 0 of the experiment, then ZMapp is administered to patients in the treatment group on day 1. Vomiting and temperature is again recorded on day 14.
+
+a. Without using any covariates, answer this question with regression: What is the estimated effect of ZMapp (with standard error in parentheses) on whether someone was vomiting on day 14? What is the p-value associated with this estimate?
+
+```{r}
+model5a <- lm(vomiting_day14 ~ treat_zmapp, data = d)
+
+# Use previously defined equations to find robust confidence intervals
+ans <- processrobust(model5a, row = 2, z_val = 1.96)
+# Use coeftest to find the robust p value
+coeftestvalues <- coeftest(model5a, vcovHC(model5a))
+
+summary(model5a)
+paste("The treatment effect estimate is", signif(summary(model5a)$coefficients[2,1],3))
+paste("The robust standard error is", ans[3])
+paste("The 95% robust confidence interval is (", ans[1],",",ans[2],")")
+paste("The associated p-value is", signif(summary(model5a)$coefficients[2,4],3))
+paste("The associated robust p-value is", signif(coeftestvalues[2,4],3))
+```
+
+b. Add covariates for vomiting on day 0 and patient temperature on day 0 to the regression from part (a) and report the ATE (with standard error). Also report the p-value.
+
+```{r}
+model5b <- lm(vomiting_day14 ~ treat_zmapp + vomiting_day0 + temperature_day0, data = d)
+
+# Use previously defined equations to find robust confidence intervals
+ans <- processrobust(model5b, row = 2, z_val = 1.96)
+# Use coeftest to find the robust p value
+coeftestvalues <- coeftest(model5b, vcovHC(model5b))
+
+summary(model5b)
+paste("The treatment effect estimate is", signif(summary(model5b)$coefficients[2,1],3))
+paste("The robust standard error is", ans[3])
+paste("The 95% robust confidence interval is (", ans[1],",",ans[2],")")
+paste("The associated p-value is", signif(summary(model5b)$coefficients[2,4],3))
+paste("The associated robust p-value is", signif(coeftestvalues[2,4],3))
+```
+
+c. Do you prefer the estimate of the ATE reported in part (a) or part (b)? Why?
+
+**Adam Yang:** I prefer the estimate of the ATE reported in part b. The robust standard error in part b is 0.082, which is smaller than the robust standard error in part a (0.0915). Hence the robust confidence interval for part b is also narrower. It seems like adding the relevant covariates to the regression was able to absorb some of the residual variance. Furthermore, the magnitude of the estimated treatment effect dropped from -0.238 to -0.166. I believe that `vomiting_day0` and `temperature_day0` gives us a sense of how sick the patient is before the experiment which would intuitively have an impact on `vomiting_day14`. Therefore, the drop in magnitude of the estimated ATE might be due to us addressing that omitted variable bias by adding in those covariates into the regression of part b. Lastly, the adjusted R-squared in part b is 0.2895 which is quite a bit larger than the adjusted R-squared in part a (0.06343). This suggests that the independent variables in part b better explains the variation in the dependent variable.
+
+d. The regression from part (b) suggests that temperature is highly predictive of vomiting. Also include temperature on day 14 as a covariate in the regression from part (b) and report the ATE, the standard error, and the p-value.
+
+```{r}
+model5d <- lm(vomiting_day14 ~ treat_zmapp + vomiting_day0 + temperature_day0 + temperature_day14, data = d)
+
+# Use previously defined equations to find robust confidence intervals
+ans <- processrobust(model5d, row = 2, z_val = 1.96)
+# Use coeftest to find the robust p value
+coeftestvalues <- coeftest(model5d, vcovHC(model5d))
+
+summary(model5d)
+paste("The treatment effect estimate is", signif(summary(model5d)$coefficients[2,1],3))
+paste("The robust standard error is", ans[3])
+paste("The 95% robust confidence interval is (", ans[1],",",ans[2],")")
+paste("The associated p-value is", signif(summary(model5d)$coefficients[2,4],3))
+paste("The associated robust p-value is", signif(coeftestvalues[2,4],3))
+```
+
+e. Do you prefer the estimate of the ATE reported in part (b) or part (d)? Why?
+
+**Adam Yang:** I prefer the estimate of the ATE reported in part b because the robust standard error in part d is larger than that of part b (0.0858 > 0.082). Furthermore, I believe that `temperature_day14` might be a post treatment variable because it was measured after the treatment was given, which makes it a bad control. This is because your temperature on day 14 might very much be related to or a consequence of whether or not you are vomiting on day 14. I don't think it is good practice to add another dependent variable into the regression as a covariate because it will introduce a non-zero bias that we cannot know the size or direction of.
+
+f. Now let's switch from the outcome of vomiting to the outcome of temperature, and use the same regression covariates as in part (b). Test the hypothesis that ZMapp is especially likely to reduce men's temperatures, as compared to women's, and describe how you did so. What do the results suggest?
+
+```{r}
+model5f <- lm(temperature_day14 ~ treat_zmapp + treat_zmapp*male + male 
+              + vomiting_day0 + temperature_day0, data = d)
+
+# Use previously defined equations to find robust confidence intervals
+ans <- processrobust(model5f, row = 2, z_val = 1.96)
+# Use coeftest to find the robust p value
+coeftestvalues <- coeftest(model5f, vcovHC(model5f))
+
+summary(model5f)
+paste("The estimated treatment effect on females only is", signif(summary(model5f)$coefficients[2,1],3))
+paste("The estimated treatment effect on males only is", signif(summary(model5f)$coefficients[2,1] + summary(model5f)$coefficients[6,1],3))
+```
+
+**Adam Yang:** I added an interaction term of $treat\_zmapp*male$ which means that the estimated treatment effect of ZMapp on day 14 temperature is now $-0.231 + -2.08*Male$. When the subject is female, the estimated treatment effect of ZMapp on day 14 temperature is $-0.231 + -2.08*0 = -0.231$. When the subject is male, the estimated treatment effect of ZMapp on day 14 temperature is $-0.231  + -2.08*1 = -2.31$. This shows that the estimated treatment effect of ZMapp on males is quite a bit higher than the estimated treatment effect of ZMapp on females. Specifically, ZMapp reduces men's temperature 2 degrees more than it does for women. Furthermore, according to the summary chart shown above, the estimated treatment effect of ZMapp on the day 14 temperature of women is not statistically significant at a level of 0.05. On the other hand, the heterogeneous treatment effect represented by the interaction term is shown to be statistically significant (p value at interaction term is approximately 0). That means we can reject the null hypothesis that the treatment effect of ZMapp is equal for both men and women.
+
+g. Suppose that you had not run the regression in part (f). Instead, you speak with a colleague to learn about heterogeneous treatment effects. This colleague has access to a non-anonymized version of the same data set and reports that he had looked at heterogeneous effects of the ZMapp treatment by each of 10,000 different covariates to examine whether each predicted the effectiveness of ZMapp on each of 2,000 different indicators of health, for 20,000,000 different regressions in total. Across these 20,000,000 regressions your colleague ran, the treatment's interaction with gender on the outcome of temperature is the only heterogeneous treatment effect that he found to be statistically significant. He reasons that this shows the importance of gender for understanding the effectiveness of the drug, because nothing else seemed to indicate why it worked. Bolstering his confidence, after looking at the data, he also returned to his medical textbooks and built a theory about why ZMapp interacts with processes only present in men to cure. Another doctor, unfamiliar with the data, hears his theory and finds it plausible. How likely do you think it is ZMapp works especially well for curing Ebola in men, and why? (This question is conceptual can be answered without performing any computation.)
+
+**Adam Yang:** I would not have much confidence in this finding because my colleague seemed to be fishing for a statistically significant heterogeneous effect, thereby introducing the multiple comparisons problem. He ended up running 20,000,000 regressions with 10,000 different covariates on 2,000 different indicators of health. By running so many hypothesis tests to look for a significant heterogeneous effect, it is very likely that one out of these 20,000,000 hypothesis tests would result with a statistically significant heterogeneous effect. In fact, if we use the equation shown in page 300 of *Field Experiments*, we see that the probability is essentially 1. However, this can be caused by random chance rather than actually being statistically significant. Because he ran 20,000,000 hypothesis tests, he should have applied the Bonferroni correction to his significance level so that the p-value must be smaller than 2.5e-09 to be considered statistically significant. The p-value we found in part f is 2.2e-16 which is smaller than 2.5e-09 so maybe we would believe this result. However, this is a hypothetical situation where we did not run the regression in part f, so I would maintain that I would not have confidence in this finding from just hearing of my colleague's work. I would recommend using a different data sample to test this hypothesis again.
+
+```{r}
+# Bonferroni Correction
+alpha = 0.05 # significance level of 0.05
+m = 20000000 # number of hypotheses being tested
+
+paste("The new significance level should be",alpha/m)
+
+# The probabliity of finding at least one covariate that significantly interacts with the treatment at the 0.05 significance level is 1 - (1 - 0.05)^20,000,000
+
+paste("The probability of finding at least one covariate that significantly interacts with the treatment at the 0.05 significance level with 20,000,000 comparisons is",1 - (1 - 0.05)**20000000)
+```
+
+h. Now, imagine that what described in part (g) did not happen, but that you had tested this heterogeneous treatment effect, and only this heterogeneous treatment effect, of your own accord. Would you be more or less inclined to believe that the heterogeneous treatment effect really exists? Why?
+
+**Adam Yang:** In this case, I would be more inclined to believe that the heterogeneous treatment effect really exists because we did not run a bunch of hypothesis tests to fish for a statistically significant result. Furthermore, in part f, we found that the p-value of the interaction term is 2.2e-16 which means it very unlikely that the null hypothesis is true.
+
+i. Another colleague proposes that being of African descent causes one to be more likely to get Ebola. He asks you what ideal experiment would answer this question. What would you tell him?  (*Hint: refer to Chapter 1 of Mostly Harmless Econometrics.*)
+
+**Adam Yang:** My first thought would be that the research question is not very clear. What does my colleague mean by African descent? Does he mean people who are born in Africa? Does he mean people who have lived in Africa all their lives? Does he mean people who have multiple generations of ancestors who have lived in Africa? Does he mean people with darker skin color? Does he mean African Americans who live in the US but have ancestors from Africa?
+
+Determining the other group to compare these "people of African descent" to is equally, if not more, confusing and convoluted. Furthermore, there is no obvious way to randomly apply treatment. How do we randomly assign people to be of "African descent"? Perhaps if you can get the definition of "African descent" clear as well as specify which other group to compare them to, then you can possibly do the analysis with observational data. However, designing an experiment would be very difficult, if not impossible to do. I think the question proposed by my colleague is a fundamentally unidentified question that cannot be answered by any experiment.
