@@ -1,0 +1,134 @@
+---
+title: "WFT Yield Linear Regression with Known Yield Trackers"
+author: "Adam Yang"
+date: "8/2/2018"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Introduction
+
+Over the course of 14 hp development, the main aim of the characterization team is to figure out how to maximize the core yield per chip on our product wafers. The team has mainly utilized Diagon (SRAM) yield and Sail (Logic) yield to predict the resulting product chip yield. In addition, we've identified Fin Residuals, Epi Etch Out, and faulty DC10 tool usage to be some major product yield detractors. 
+
+The goal of this excercise is to create a linear regression model based on each of the factors that we've discovered to have an impact on wafer final test (WFT) yield. The data used includes by wafers that are tested in the 30 days time period before 8/2/2018. The variables used in the regression are:
+
+|**Variable**|**Label**|**Source**|
+|------------|---------|----------|
+|wft8to24|Wafer Final Test 8 to 24 Core Yield|Brian Walsh|
+|wft22to24|Wafer Final Test 22 to 24 Core Yield|Brian Walsh|
+|dgvmax|Diagon A102 1.25v Perfect Yield (SRAM)|Baldy|
+|sailvmax|Sail 1.25v Perfect Yield (Logic)|Baldy|
+|sailvmin_ly|Sail 0.5v Limited Yield (Epi Etch Out Tracker)|Baldy|
+|fin_res|Y = Yes, M = Maybe, N = No for Fin Res|Adam Yang|
+|fin_res_metric_2|Numeric Representation of Fin Res|Adam Yang
+|PC.DC10|Did the wafer go through DC10 tool in PC?|Baldy|
+|CT.DC10|Did the wafer go through DC10 tool in CT?|Baldy|
+|DC10|Did the wafer go through DC10 tool in PC or CT?|Baldy|
+
+# Data Loading and Cleaning
+```{R}
+setwd("~/Desktop/WFTAnalysis/")
+getwd()
+# Pull csv file and create wft df
+wft <- read.csv("WFT.csv")
+# Change column names for easier calls
+colnames(wft)[3:7] <- c("wft8to24", "wft22to24", "dgvmax", "sailvmax", "sailvmin_ly")
+# Convert wft yields to percentage values
+wft$wft8to24 <- wft$wft8to24*100
+wft$wft22to24 <- wft$wft22to24*100
+# Create USwft df for only US wafers
+USwft <- wft[wft$FAMILY_CODE == "US",]
+```
+
+```{R}
+library(car)
+library(reshape2)
+library(ggplot2)
+library(sandwich)
+library(stargazer)
+library(lmtest)
+```
+# Scatterplot Matrix and Check for Multicolinearity
+
+Perfectly multicolinear variables are prohibited in OLS regression, though they are unlikely to be found in our data set. Less-than-perfect colinearity can still be problematic, adding variance to a model, so if any highly colinear groups of variables are identified, we may have to consider their impact on the precision of our model. Below is a scatter plot matrix and a correlation table which shows that only wft8to24 and wft22to24 have a strong colinearity but they are 2 separate output variables so this is not a concern.
+
+```{R}
+# Scatter Plot Matrix
+scatterplotMatrix(~wft8to24+wft22to24+dgvmax+sailvmax+sailvmin_ly, data = wft)
+hist(log(wft$fin_res_metric2))
+# Correlation Table
+cor(wft[c("wft8to24", "wft22to24", "dgvmax", "sailvmax", "sailvmin_ly", "fin_res_metric2")],
+              use = "complete.obs")
+```
+Clustering exists between wafers in the same lot so not a totally random sample.
+
+```{R}
+# Create model for 8-24c yield vs. only dg and sail yield.
+model1 <- lm(wft8to24 ~ dgvmax+sailvmax, data = wft)
+# Residuals-Fitted Values plot (Zero Conditional Mean)
+plot(model1, 1)
+# Scale-Location plot (Homoskedasticity)
+plot(model1, 3)
+# Breusch-Pagan Test for Homoskedasticity
+bptest(model1)
+# Q-Q Plot (Normality of Residuals)
+plot(model1, 2)
+# Shapiro-Wilk test of normality 
+shapiro.test(model1$residuals)
+# Histogram of Residuals
+hist(model1$residuals)
+# Residuals-Leverage plot
+plot(model1, 5) # No problem with Cook's distance
+# a general rule is that if 1 % (or more) data points have standardized residuals > 2.5, the model contains too much error. If 5% (or more) of data points have residuals > 2, the model has too much error and represents our data poorly.
+a <- rstudent(model1)
+summary(model1)
+b <- a[a < -3]
+
+model1.5<- lm(wft8to24 ~ dgvmax, data = wft)
+summary(model1.5)
+plot(wft$dgvmax, wft$wft8to24)
+```
+
+```{R}
+#linearHypothesis(model1, c("dgvmax = 0", " sailvmax = 0"), vcov = vcovHC)
+linearHypothesis(model1, c("dgvmax = 0", " sailvmax = 0"))
+
+paste("adj.r.square:", summary(model1)$adj.r.squared)
+
+coeftest(model1)
+```
+
+```{R}
+model <- lm(wft8to24 ~ dgvmax+sailvmax+sailvmin_ly+fin_res_metric2, data = wft)
+plot(model)
+model$coefficients
+sd(wft$wft8to24)
+summary(model)$adj.r.square
+```
+
+```{R}
+USmodel <- lm(wft8to24 ~ dgvmax+sailvmax+sailvmin_ly+fin_res_metric2, data = USwft)
+plot(USmodel)
+USmodel$coefficients
+```
+
+```{R}
+USmodel2 <- lm(wft22to24 ~ dgvmax+sailvmax+sailvmin_ly+fin_res_metric2, data = USwft)
+plot(USmodel2)
+USmodel2$coefficients
+```
+
+
+```{R}
+data <- read.csv("LotLevel8-24C.csv")
+modelLL <- lm(WFT_Yield~DG_Yield+Sail_Yield, data = data)
+modela <- lm(WFT_Yield~DG_Yield, data = data)
+plot(modelLL)
+summary(modelLL)
+summary(modela)
+plot(data$DG_Yield, data$WFT_Yield)
+plot(data$Sail_Yield, data$WFT_Yield)
+```
